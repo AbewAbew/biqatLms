@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from lms.lms.utils import can_modify_course
@@ -5,6 +7,7 @@ from lms.lms.utils import can_modify_course
 from biqat_lms.api import (
 	get_course_details,
 	get_course_experts_map,
+	get_created_courses,
 	get_profile_details,
 	list_instructor_profiles,
 	save_instructor_profile,
@@ -96,6 +99,19 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		self.profile.save(ignore_permissions=True)
 
 		self.assertEqual(get_course_experts_map([self.course.name]), {})
+
+	def test_admin_home_course_card_uses_public_instructor(self):
+		stock_course = frappe._dict(
+			{
+				"name": self.course.name,
+				"instructors": [frappe._dict({"name": "Administrator", "full_name": "Administrator"})],
+			}
+		)
+		with patch("biqat_lms.api.lms_get_created_courses", return_value=[stock_course]):
+			courses = get_created_courses()
+
+		self.assertEqual(courses[0].instructors[0].full_name, self.profile.full_name)
+		self.assertEqual(courses[0].biqat_experts[0].profile_name, self.profile.name)
 
 	def test_duplicate_course_assignment_is_rejected(self):
 		self.profile.append(
