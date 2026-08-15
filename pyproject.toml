@@ -1,7 +1,7 @@
 [project]
 name = "biqat_lms"
 authors = [
-    { name = "Biqat", email = "admin@biqat.local"}
+    { name = "Biqat", email = "abenezerberbatov@gmail.com"}
 ]
 description = "Customizations and integrations for the Biqat learning platform"
 requires-python = ">=3.10"
@@ -10,6 +10,14 @@ dynamic = ["version"]
 dependencies = [
     # "frappe~=15.0.0" # Installed and managed by bench.
 ]
+
+[tool.bench.frappe-dependencies]
+frappe = ">=15.0.0,<16.0.0"
+lms = ">=2.54.2,<3.0.0"
+payments = ">=0.0.1,<1.0.0"
+
+[project.urls]
+Repository = "https://github.com/AbewAbew/biqatLms"
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]

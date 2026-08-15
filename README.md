@@ -4,12 +4,18 @@ Customizations and integrations for the Biqat learning platform
 
 ### Installation
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+This app targets Frappe Framework v15 and Frappe Learning v2.54.2. Install its
+upstream dependencies first:
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app biqat_lms
+bench get-app --branch version-15 payments https://github.com/frappe/payments.git
+bench get-app --branch v2.54.2 lms https://github.com/frappe/lms.git
+bench get-app --branch develop biqat_lms https://github.com/AbewAbew/biqatLms.git
+
+bench --site $SITE_NAME install-app payments
+bench --site $SITE_NAME install-app lms
+bench --site $SITE_NAME install-app biqat_lms
 ```
 
 ### Contributing

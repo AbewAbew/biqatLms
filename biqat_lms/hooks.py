@@ -2,13 +2,13 @@ app_name = "biqat_lms"
 app_title = "Biqat Learning"
 app_publisher = "Biqat"
 app_description = "Customizations and integrations for the Biqat learning platform"
-app_email = "admin@biqat.local"
+app_email = "abenezerberbatov@gmail.com"
 app_license = "agpl-3.0"
 
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe/lms"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -246,4 +246,3 @@ app_license = "agpl-3.0"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
