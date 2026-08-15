@@ -100,9 +100,9 @@ uploaded Biqat logo replaces the old Frappe icon.
 ## Onboarding and help
 
 Frappe Learning's stock **Getting started** popup and its link to the upstream
-Frappe Help Centre are disabled. The server-side onboarding status is left
-untouched so this area can later be replaced with Biqat's own setup steps and
-user manual.
+Frappe Help Centre are disabled. The **Powered by Frappe Learning** sidebar
+icon is also hidden. The server-side onboarding status is left untouched so
+this area can later be replaced with Biqat's own setup steps and user manual.
 
 ## GitHub workflow
 

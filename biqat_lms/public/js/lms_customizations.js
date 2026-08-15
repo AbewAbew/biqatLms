@@ -2,7 +2,7 @@ const INDIA_GST_LABEL = "Apply GST for India";
 const BRANDING_SAVE_ENDPOINT = "/api/method/frappe.client.set_value";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
-const BRANDING_CACHE_VERSION = "4";
+const BRANDING_CACHE_VERSION = "5";
 
 let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
@@ -168,12 +168,12 @@ function hideIndiaGstControl() {
 	}
 }
 
-function hideFrappeHelpUi() {
+function hideUpstreamFrappeUi() {
 	for (const modal of document.querySelectorAll('[data-testid="onboarding-help-modal"]')) {
 		modal.remove();
 	}
 
-	for (const icon of document.querySelectorAll("svg.lucide-circle-help")) {
+	for (const icon of document.querySelectorAll("svg.lucide-circle-help, svg.lucide-zap")) {
 		if (icon.closest(".bg-surface-menu-bar")) icon.hidden = true;
 	}
 }
@@ -184,7 +184,7 @@ const observer = new MutationObserver(() => {
 	updateScheduled = true;
 	queueMicrotask(() => {
 		hideIndiaGstControl();
-		hideFrappeHelpUi();
+		hideUpstreamFrappeUi();
 		repairBrandingImages();
 		updateScheduled = false;
 	});
@@ -194,7 +194,7 @@ const headObserver = new MutationObserver(() => repairBrandingImages());
 
 function initializeDomCustomizations() {
 	hideIndiaGstControl();
-	hideFrappeHelpUi();
+	hideUpstreamFrappeUi();
 	repairBrandingImages();
 	observer.observe(document.body, { childList: true, subtree: true });
 	headObserver.observe(document.head, {
