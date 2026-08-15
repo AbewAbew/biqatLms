@@ -6,6 +6,7 @@ from frappe import _
 from frappe.client import get_list as frappe_get_list
 from frappe.utils import cint, escape_html
 from lms.lms.api import get_created_courses as lms_get_created_courses
+from lms.lms.api import get_my_courses as lms_get_my_courses
 from lms.lms.api import get_profile_details as lms_get_profile_details
 from lms.lms.utils import (
 	can_modify_course,
@@ -131,6 +132,19 @@ def get_course_details(course: str):
 def get_created_courses():
 	"""Return administrator dashboard courses with their public instructors."""
 	courses = lms_get_created_courses()
+	experts_by_course = get_course_experts_map([course.name for course in courses])
+	for course in courses:
+		experts = experts_by_course.get(course.name, [])
+		course.biqat_experts = experts
+		if experts:
+			course.instructors = experts
+	return courses
+
+
+@frappe.whitelist()
+def get_my_courses():
+	"""Return student Home courses with their public instructors."""
+	courses = lms_get_my_courses()
 	experts_by_course = get_course_experts_map([course.name for course in courses])
 	for course in courses:
 		experts = experts_by_course.get(course.name, [])
