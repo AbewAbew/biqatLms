@@ -83,7 +83,10 @@ required_apps = ["frappe/lms"]
 # ------------
 
 # before_install = "biqat_lms.install.before_install"
-# after_install = "biqat_lms.install.after_install"
+after_install = "biqat_lms.setup.payment_defaults.configure_ethiopian_payments"
+
+# Keep site-level defaults present after app updates and migrations.
+after_migrate = "biqat_lms.setup.payment_defaults.configure_ethiopian_payments"
 
 # Uninstallation
 # ------------
@@ -137,13 +140,21 @@ required_apps = ["frappe/lms"]
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Chapa Settings": {
+		"on_update": "biqat_lms.setup.payment_defaults.create_chapa_gateway",
+	},
+	"LMS Settings": {
+		"validate": "biqat_lms.setup.payment_defaults.validate_payment_configuration",
+	},
+}
+
+# Keep the stock payment integrations installed, but expose only the gateways
+# selected for the Biqat LMS administrator interface.
+override_whitelisted_methods = {
+	"frappe.client.get_list": "biqat_lms.api.get_list",
+	"lms.lms.api.get_branding": "biqat_lms.branding.get_branding",
+}
 
 # Scheduled Tasks
 # ---------------
@@ -203,6 +214,11 @@ required_apps = ["frappe/lms"]
 # ----------
 # before_job = ["biqat_lms.utils.before_job"]
 # after_job = ["biqat_lms.utils.after_job"]
+
+# LMS single-page application customizations
+# -------------------------------------------
+
+page_renderer = ["biqat_lms.page_renderers.BiqatLMSRenderer"]
 
 # User Data Protection
 # --------------------
