@@ -1,7 +1,7 @@
 const INDIA_GST_LABEL = "Apply GST for India";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
-const BRANDING_CACHE_VERSION = "7";
+const BRANDING_CACHE_VERSION = "8";
 const UI_STYLE_ID = "biqat-lms-ui-overrides";
 
 let brandingLogoUrl = null;
@@ -23,9 +23,12 @@ function installUiStyles() {
 	const style = document.createElement("style");
 	style.id = UI_STYLE_ID;
 	style.textContent = `
-		.bg-surface-menu-bar .lucide-circle-help,
-		.bg-surface-menu-bar .lucide-phone,
-		.bg-surface-menu-bar .lucide-zap {
+		.bg-surface-sidebar .m-2.flex.flex-col.gap-1
+			> .flex.items-center.mt-4
+			> .flex.items-center.flex-1.gap-3,
+		.bg-surface-sidebar .lucide-circle-help,
+		.bg-surface-sidebar .lucide-phone,
+		.bg-surface-sidebar .lucide-zap {
 			display: none !important;
 		}
 	`;
@@ -91,7 +94,7 @@ window.fetch = (resource, options) => {
 function repairBrandingImages() {
 	if (brandingLogoUrl) {
 		const sidebarLogo = document.querySelector(
-			".bg-surface-menu-bar .p-2 button img.w-8.h-8.rounded"
+			".bg-surface-sidebar .p-2 button img.w-8.h-8.rounded"
 		);
 		if (sidebarLogo?.getAttribute("src") !== brandingLogoUrl) {
 			sidebarLogo.setAttribute("src", brandingLogoUrl);
@@ -150,8 +153,16 @@ function hideUpstreamFrappeUi() {
 		modal.remove();
 	}
 
-	for (const icon of document.querySelectorAll(".lucide-circle-help, .lucide-zap")) {
-		if (icon.closest(".bg-surface-menu-bar")) {
+	for (const controls of document.querySelectorAll(
+		".bg-surface-sidebar .m-2.flex.flex-col.gap-1 > .flex.items-center.mt-4 > .flex.items-center.flex-1.gap-3"
+	)) {
+		controls.style.setProperty("display", "none", "important");
+	}
+
+	for (const icon of document.querySelectorAll(
+		".lucide-circle-help, .lucide-phone, .lucide-zap"
+	)) {
+		if (icon.closest(".bg-surface-sidebar")) {
 			icon.style.setProperty("display", "none", "important");
 		}
 	}
