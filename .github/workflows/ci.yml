@@ -4,11 +4,11 @@ name: CI
 on:
   push:
     branches:
-      - develop
+      - main
   pull_request:
 
 concurrency:
-  group: develop-biqat_lms-${{ github.event.number }}
+  group: main-biqat_lms-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
@@ -52,7 +52,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           check-latest: true
 
       - name: Cache pip
