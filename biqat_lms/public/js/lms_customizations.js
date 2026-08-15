@@ -1,8 +1,29 @@
 const INDIA_GST_LABEL = "Apply GST for India";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
-const BRANDING_CACHE_VERSION = "8";
+const BRANDING_CACHE_VERSION = "10";
 const UI_STYLE_ID = "biqat-lms-ui-overrides";
+const SIDEBAR_LANGUAGE_SELECTOR_ID = "biqat-sidebar-language-selector";
+const SIDEBAR_LANGUAGE_STORAGE_KEY = "biqatLmsSidebarLanguage";
+const SIDEBAR_SOURCE_LABEL_ATTRIBUTE = "data-biqat-sidebar-source-label";
+const SIDEBAR_TRANSLATIONS = Object.freeze({
+	Home: "መነሻ",
+	Search: "ፍለጋ",
+	Notifications: "ማሳወቂያዎች",
+	Courses: "ኮርሶች",
+	Programs: "ፕሮግራሞች",
+	Batches: "ቡድኖች",
+	Certifications: "የምስክር ወረቀቶች",
+	Jobs: "ሥራዎች",
+	Statistics: "ስታቲስቲክስ",
+	"Contact Us": "ያግኙን",
+	Quizzes: "ፈተናዎች",
+	Assignments: "የቤት ሥራዎች",
+	"Programming Exercises": "የፕሮግራም ልምምዶች",
+	More: "ተጨማሪ",
+});
+
+let sidebarLanguage = getStoredSidebarLanguage();
 
 let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
@@ -30,6 +51,53 @@ function installUiStyles() {
 		.bg-surface-sidebar .lucide-phone,
 		.bg-surface-sidebar .lucide-zap {
 			display: none !important;
+		}
+
+		#${SIDEBAR_LANGUAGE_SELECTOR_ID} {
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+			gap: 0.125rem;
+			margin: 0 0.5rem 0.25rem;
+			padding: 0.125rem;
+			border: 1px solid var(--outline-gray-1, #e5e7eb);
+			border-radius: 0.5rem;
+			background: var(--surface-gray-2, #f3f4f6);
+		}
+
+		#${SIDEBAR_LANGUAGE_SELECTOR_ID} button {
+			min-width: 0;
+			padding: 0.25rem 0.375rem;
+			border-radius: 0.375rem;
+			color: var(--ink-gray-6, #4b5563);
+			font-size: 0.75rem;
+			line-height: 1rem;
+			text-align: center;
+		}
+
+		#${SIDEBAR_LANGUAGE_SELECTOR_ID} button:hover {
+			background: var(--surface-gray-3, #e5e7eb);
+		}
+
+		#${SIDEBAR_LANGUAGE_SELECTOR_ID} button[aria-pressed="true"] {
+			background: var(--surface-base, #ffffff);
+			box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+			color: var(--ink-gray-9, #111827);
+			font-weight: 600;
+		}
+
+		.bg-surface-sidebar.w-14 #${SIDEBAR_LANGUAGE_SELECTOR_ID} {
+			grid-template-columns: 1fr;
+			margin-inline: 0.375rem;
+		}
+
+		.bg-surface-sidebar.w-14 #${SIDEBAR_LANGUAGE_SELECTOR_ID} button {
+			font-size: 0;
+			padding-inline: 0.125rem;
+		}
+
+		.bg-surface-sidebar.w-14 #${SIDEBAR_LANGUAGE_SELECTOR_ID} button::after {
+			content: attr(data-short-label);
+			font-size: 0.6875rem;
 		}
 	`;
 	document.head.appendChild(style);
@@ -168,6 +236,103 @@ function hideUpstreamFrappeUi() {
 	}
 }
 
+function getStoredSidebarLanguage() {
+	try {
+		return localStorage.getItem(SIDEBAR_LANGUAGE_STORAGE_KEY) === "en" ? "en" : "am";
+	} catch {
+		return "am";
+	}
+}
+
+function storeSidebarLanguage(language) {
+	try {
+		localStorage.setItem(SIDEBAR_LANGUAGE_STORAGE_KEY, language);
+	} catch {
+		// The selector still works for the current page when storage is unavailable.
+	}
+}
+
+function setSidebarLanguage(language) {
+	sidebarLanguage = language === "en" ? "en" : "am";
+	storeSidebarLanguage(sidebarLanguage);
+	applySidebarLanguage();
+}
+
+function createSidebarLanguageButton(language, label, shortLabel) {
+	const button = document.createElement("button");
+	button.type = "button";
+	button.dataset.language = language;
+	button.dataset.shortLabel = shortLabel;
+	button.textContent = label;
+	button.setAttribute("aria-label", language === "am" ? "አማርኛ" : "English");
+	button.addEventListener("click", () => setSidebarLanguage(language));
+	return button;
+}
+
+function ensureSidebarLanguageSelector(sidebar) {
+	let selector = document.getElementById(SIDEBAR_LANGUAGE_SELECTOR_ID);
+	if (selector) return selector;
+
+	const scrollArea = sidebar.querySelector(":scope > .flex.flex-col.overflow-y-auto");
+	const userDropdown = scrollArea?.firstElementChild;
+	if (!scrollArea || !userDropdown) return null;
+
+	selector = document.createElement("div");
+	selector.id = SIDEBAR_LANGUAGE_SELECTOR_ID;
+	selector.setAttribute("role", "group");
+	selector.setAttribute("aria-label", "የጎን ምናሌ ቋንቋ / Sidebar language");
+	selector.append(
+		createSidebarLanguageButton("am", "አማርኛ", "አማ"),
+		createSidebarLanguageButton("en", "English", "EN")
+	);
+	userDropdown.insertAdjacentElement("afterend", selector);
+	return selector;
+}
+
+function translateSidebarLabels(sidebar) {
+	const amharicToEnglish = Object.fromEntries(
+		Object.entries(SIDEBAR_TRANSLATIONS).map(([english, amharic]) => [amharic, english])
+	);
+
+	for (const element of sidebar.querySelectorAll("span")) {
+		if (element.closest(`#${SIDEBAR_LANGUAGE_SELECTOR_ID}`) || element.children.length) {
+			continue;
+		}
+
+		const currentLabel = element.textContent.trim();
+		let sourceLabel = element.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
+		if (!sourceLabel) {
+			sourceLabel = Object.hasOwn(SIDEBAR_TRANSLATIONS, currentLabel)
+				? currentLabel
+				: amharicToEnglish[currentLabel];
+			if (!sourceLabel) continue;
+			element.setAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE, sourceLabel);
+		}
+
+		const desiredLabel =
+			sidebarLanguage === "am" ? SIDEBAR_TRANSLATIONS[sourceLabel] : sourceLabel;
+		if (desiredLabel && currentLabel !== desiredLabel) {
+			element.textContent = desiredLabel;
+		}
+	}
+}
+
+function applySidebarLanguage() {
+	const sidebar = document.querySelector(
+		".bg-surface-sidebar.flex.h-full.flex-col.justify-between"
+	);
+	if (!sidebar) return;
+
+	const selector = ensureSidebarLanguageSelector(sidebar);
+	for (const button of selector?.querySelectorAll("button") || []) {
+		button.setAttribute(
+			"aria-pressed",
+			button.dataset.language === sidebarLanguage ? "true" : "false"
+		);
+	}
+	translateSidebarLabels(sidebar);
+}
+
 let updateScheduled = false;
 const observer = new MutationObserver(() => {
 	if (updateScheduled) return;
@@ -175,6 +340,7 @@ const observer = new MutationObserver(() => {
 	queueMicrotask(() => {
 		hideIndiaGstControl();
 		hideUpstreamFrappeUi();
+		applySidebarLanguage();
 		repairBrandingImages();
 		updateScheduled = false;
 	});
@@ -185,6 +351,7 @@ const headObserver = new MutationObserver(() => repairBrandingImages());
 function initializeDomCustomizations() {
 	hideIndiaGstControl();
 	hideUpstreamFrappeUi();
+	applySidebarLanguage();
 	repairBrandingImages();
 	observer.observe(document.body, { childList: true, subtree: true });
 	headObserver.observe(document.head, {
