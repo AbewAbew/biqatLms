@@ -5,6 +5,7 @@ from frappe.tests.utils import FrappeTestCase
 from lms.lms.utils import can_modify_course
 
 from biqat_lms.api import (
+	enroll_in_program,
 	get_course_details,
 	get_course_experts_map,
 	get_created_courses,
@@ -15,6 +16,7 @@ from biqat_lms.api import (
 	save_instructor_profile,
 	set_course_instructor_profiles,
 )
+from biqat_lms.setup.programs import sync_program_member_counts
 
 
 class TestBiqatInstructorProfile(FrappeTestCase):
@@ -144,6 +146,37 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 
 		self.assertEqual(program.courses[0].instructors[0].full_name, self.profile.full_name)
 		self.assertEqual(program.courses[0].biqat_experts[0].profile_name, self.profile.name)
+
+	def test_student_program_enrollment_updates_member_count(self):
+		program = frappe.get_doc(
+			{
+				"doctype": "LMS Program",
+				"title": f"Managed Instructor Program {frappe.generate_hash(length=8)}",
+				"published": 1,
+				"program_courses": [{"course": self.course.name}],
+			}
+		).insert(ignore_permissions=True)
+
+		frappe.set_user(self.student_email)
+		enroll_in_program(program.name)
+
+		member = frappe.db.get_value(
+			"LMS Program Member",
+			{"parent": program.name, "member": self.student_email},
+			"parentfield",
+		)
+		self.assertEqual(member, "program_members")
+		self.assertEqual(frappe.db.get_value("LMS Program", program.name, "member_count"), 1)
+
+		frappe.db.set_value("LMS Program Member", {"parent": program.name}, "parentfield", "members")
+		frappe.db.set_value("LMS Program", program.name, "member_count", 0)
+		sync_program_member_counts()
+
+		self.assertEqual(
+			frappe.db.get_value("LMS Program Member", {"parent": program.name}, "parentfield"),
+			"program_members",
+		)
+		self.assertEqual(frappe.db.get_value("LMS Program", program.name, "member_count"), 1)
 
 	def test_duplicate_course_assignment_is_rejected(self):
 		self.profile.append(

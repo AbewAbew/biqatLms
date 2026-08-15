@@ -3,6 +3,7 @@ from frappe.tests.utils import FrappeTestCase
 from lms import __version__ as lms_version
 from packaging.version import Version
 
+import biqat_lms.hooks as biqat_hooks
 from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list
 from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
@@ -94,3 +95,6 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		self.assertEqual(customized_html.count(CUSTOMIZATION_SCRIPT), 1)
 		self.assertLess(customized_html.index(CUSTOMIZATION_SCRIPT), customized_html.index("app.js"))
 		self.assertEqual(inject_customization_script(customized_html), customized_html)
+
+	def test_default_website_profile_redirects_to_lms(self):
+		self.assertIn({"source": "/me", "target": "/lms"}, biqat_hooks.website_redirects)

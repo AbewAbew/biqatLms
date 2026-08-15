@@ -13,6 +13,9 @@ from lms.lms.utils import (
 	has_moderator_role,
 )
 from lms.lms.utils import (
+	enroll_in_program as lms_enroll_in_program,
+)
+from lms.lms.utils import (
 	get_course_details as lms_get_course_details,
 )
 from lms.lms.utils import (
@@ -21,6 +24,8 @@ from lms.lms.utils import (
 from lms.lms.utils import (
 	get_program_details as lms_get_program_details,
 )
+
+from biqat_lms.setup.programs import sync_program_member_count
 
 ALLOWED_PAYMENT_GATEWAY_SETTINGS = {"Chapa Settings", "Mpesa Settings"}
 EXPERT_USERNAME_PREFIX = "expert-"
@@ -173,6 +178,27 @@ def get_program_details(program_name: str):
 			course.instructors = experts
 
 	return program
+
+
+@frappe.whitelist()
+def enroll_in_program(program: str):
+	"""Enroll a learner and keep the Program child table and count consistent."""
+	result = lms_enroll_in_program(program)
+	member = frappe.db.get_value(
+		"LMS Program Member",
+		{"parent": program, "member": frappe.session.user},
+		"name",
+	)
+	if member:
+		frappe.db.set_value(
+			"LMS Program Member",
+			member,
+			"parentfield",
+			"program_members",
+			update_modified=False,
+		)
+	sync_program_member_count(program)
+	return result
 
 
 @frappe.whitelist(allow_guest=True)

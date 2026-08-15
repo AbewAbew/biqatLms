@@ -56,6 +56,9 @@ required_apps = ["frappe/lms"]
 # Home Pages
 # ----------
 
+# Frappe OAuth sends website users to /me when no redirect was supplied.
+website_redirects = [{"source": "/me", "target": "/lms"}]
+
 # application home page (will override Website Settings)
 # home_page = "login"
 
@@ -85,8 +88,11 @@ required_apps = ["frappe/lms"]
 # before_install = "biqat_lms.install.before_install"
 after_install = "biqat_lms.setup.payment_defaults.configure_ethiopian_payments"
 
-# Keep site-level defaults present after app updates and migrations.
-after_migrate = "biqat_lms.setup.payment_defaults.configure_ethiopian_payments"
+# Keep site-level defaults and derived Program counts correct after migrations.
+after_migrate = [
+	"biqat_lms.setup.payment_defaults.configure_ethiopian_payments",
+	"biqat_lms.setup.programs.sync_program_member_counts",
+]
 
 # Uninstallation
 # ------------
@@ -158,6 +164,7 @@ override_whitelisted_methods = {
 	"lms.lms.api.get_profile_details": "biqat_lms.api.get_profile_details",
 	"lms.lms.utils.get_course_details": "biqat_lms.api.get_course_details",
 	"lms.lms.utils.get_courses": "biqat_lms.api.get_courses",
+	"lms.lms.utils.enroll_in_program": "biqat_lms.api.enroll_in_program",
 	"lms.lms.utils.get_program_details": "biqat_lms.api.get_program_details",
 }
 
