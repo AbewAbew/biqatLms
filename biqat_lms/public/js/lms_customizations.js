@@ -1,7 +1,8 @@
 const INDIA_GST_LABEL = "Apply GST for India";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
-const BRANDING_CACHE_VERSION = "6";
+const BRANDING_CACHE_VERSION = "7";
+const UI_STYLE_ID = "biqat-lms-ui-overrides";
 
 let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
@@ -15,6 +16,23 @@ function disableFrappeOnboarding() {
 }
 
 disableFrappeOnboarding();
+
+function installUiStyles() {
+	if (document.getElementById(UI_STYLE_ID)) return;
+
+	const style = document.createElement("style");
+	style.id = UI_STYLE_ID;
+	style.textContent = `
+		.bg-surface-menu-bar .lucide-circle-help,
+		.bg-surface-menu-bar .lucide-phone,
+		.bg-surface-menu-bar .lucide-zap {
+			display: none !important;
+		}
+	`;
+	document.head.appendChild(style);
+}
+
+installUiStyles();
 
 function getRequestPath(resource) {
 	const url = typeof resource === "string" ? resource : resource?.url;
@@ -90,6 +108,12 @@ function repairBrandingImages() {
 }
 
 function hideIndiaGstControl() {
+	for (const row of document.querySelectorAll(".flex.items-center.justify-between.gap-4.py-3")) {
+		if (row.textContent.includes(INDIA_GST_LABEL)) {
+			row.style.setProperty("display", "none", "important");
+		}
+	}
+
 	for (const label of document.querySelectorAll("label, div")) {
 		if (label.textContent.trim() !== INDIA_GST_LABEL) continue;
 		if (
@@ -127,7 +151,9 @@ function hideUpstreamFrappeUi() {
 	}
 
 	for (const icon of document.querySelectorAll(".lucide-circle-help, .lucide-zap")) {
-		if (icon.closest(".bg-surface-menu-bar")) icon.hidden = true;
+		if (icon.closest(".bg-surface-menu-bar")) {
+			icon.style.setProperty("display", "none", "important");
+		}
 	}
 }
 
