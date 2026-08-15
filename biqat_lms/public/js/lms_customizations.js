@@ -1,8 +1,7 @@
 const INDIA_GST_LABEL = "Apply GST for India";
-const BRANDING_SAVE_ENDPOINT = "/api/method/frappe.client.set_value";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
-const BRANDING_CACHE_VERSION = "5";
+const BRANDING_CACHE_VERSION = "6";
 
 let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
@@ -16,60 +15,6 @@ function disableFrappeOnboarding() {
 }
 
 disableFrappeOnboarding();
-
-function findBrandingImageUrl(fieldLabel) {
-	for (const element of document.querySelectorAll("div")) {
-		const hasMatchingText = Array.from(element.childNodes).some(
-			(node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim() === fieldLabel
-		);
-		if (!hasMatchingText) continue;
-
-		let fieldContainer = element.parentElement;
-		for (let level = 0; fieldContainer && level < 5; level += 1) {
-			const image = fieldContainer.querySelector("img");
-			if (image?.getAttribute("src")) {
-				return image.getAttribute("src");
-			}
-			fieldContainer = fieldContainer.parentElement;
-		}
-	}
-	return null;
-}
-
-function repairBrandingSaveRequest(resource, options = {}) {
-	const url = typeof resource === "string" ? resource : resource?.url;
-	if (!url?.endsWith(BRANDING_SAVE_ENDPOINT) || !options.body) {
-		return options;
-	}
-
-	let body;
-	try {
-		body = JSON.parse(options.body);
-	} catch {
-		return options;
-	}
-
-	const fields = body?.fieldname;
-	if (
-		body?.doctype !== "Website Settings" ||
-		body?.name !== "Website Settings" ||
-		!fields ||
-		!("banner_image" in fields || "favicon" in fields)
-	) {
-		return options;
-	}
-
-	const bannerImage = findBrandingImageUrl("Logo");
-	const favicon = findBrandingImageUrl("Favicon");
-
-	if (bannerImage) {
-		fields.banner_image = bannerImage;
-		fields.app_logo = bannerImage;
-	}
-	if (favicon) fields.favicon = favicon;
-
-	return { ...options, body: JSON.stringify(body) };
-}
 
 function getRequestPath(resource) {
 	const url = typeof resource === "string" ? resource : resource?.url;
@@ -118,7 +63,7 @@ function captureBrandingResponse(response) {
 
 const originalFetch = window.fetch.bind(window);
 window.fetch = (resource, options) => {
-	const response = originalFetch(resource, repairBrandingSaveRequest(resource, options));
+	const response = originalFetch(resource, options);
 	if (getRequestPath(resource) === BRANDING_ENDPOINT) {
 		response.then(captureBrandingResponse).catch(() => {});
 	}
@@ -145,8 +90,16 @@ function repairBrandingImages() {
 }
 
 function hideIndiaGstControl() {
-	for (const label of document.querySelectorAll("label")) {
+	for (const label of document.querySelectorAll("label, div")) {
 		if (label.textContent.trim() !== INDIA_GST_LABEL) continue;
+		if (
+			!Array.from(label.childNodes).some(
+				(node) =>
+					node.nodeType === Node.TEXT_NODE && node.textContent.trim() === INDIA_GST_LABEL
+			)
+		) {
+			continue;
+		}
 
 		let switchContainer = label.parentElement;
 		while (
@@ -173,7 +126,7 @@ function hideUpstreamFrappeUi() {
 		modal.remove();
 	}
 
-	for (const icon of document.querySelectorAll("svg.lucide-circle-help, svg.lucide-zap")) {
+	for (const icon of document.querySelectorAll(".lucide-circle-help, .lucide-zap")) {
 		if (icon.closest(".bg-surface-menu-bar")) icon.hidden = true;
 	}
 }

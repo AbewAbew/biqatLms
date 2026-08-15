@@ -22,7 +22,7 @@ workflow commits tested changes directly to `main`.
 | --- | --- |
 | Frappe Framework | `v15.118.0` |
 | Payments | `version-15` |
-| Frappe Learning | `v2.54.2` |
+| Frappe Learning | `v2.60.1` |
 | Biqat Learning | `main` |
 | Python | `3.12` |
 | Node.js | `22` |
@@ -89,13 +89,16 @@ Secrets must never be committed when that integration is added.
 
 ## Branding image compatibility
 
-Biqat normalizes the LMS branding API to return logo and favicon values as
-plain `/files/...` URLs. A small LMS-page compatibility script preserves those
-URLs when the stock Branding form saves them. This prevents the stock LMS
-object-versus-string mismatch from clearing a new upload or breaking the image
-preview after a reload. It also repairs the stock sidebar's incompatible
-`banner_image.file_url` lookup and cache-busts favicon updates, so a newly
-uploaded Biqat logo replaces the old Frappe icon.
+Frappe Learning v2.60.1 returns consistent file objects for its logo and
+favicon. Biqat leaves that upstream API intact and adds a small frontend
+fallback that repairs the sidebar image if necessary and cache-busts favicon
+updates, so a newly uploaded Biqat logo replaces an older cached icon.
+
+## Course editor
+
+Frappe Learning is pinned to v2.60.1. The older v2.54.2 release did not include
+the **Course editor** tab; the pinned release includes the redesigned chapter
+and lesson editor used by course instructors and moderators.
 
 ## Onboarding and help
 
@@ -146,7 +149,7 @@ The production Bench was initialized and populated with:
 ```bash
 bench init --frappe-branch v15.118.0 --python python3.12 learning-bench
 bench get-app --branch version-15 payments https://github.com/frappe/payments.git
-bench get-app --branch v2.54.2 lms https://github.com/frappe/lms.git
+bench get-app --branch v2.60.1 lms https://github.com/frappe/lms.git
 bench get-app --branch main biqat_lms https://github.com/AbewAbew/biqatLms.git
 ```
 
@@ -156,6 +159,27 @@ The site applications were installed in this order:
 bench --site biqat.localhost install-app payments
 bench --site biqat.localhost install-app lms
 bench --site biqat.localhost install-app biqat_lms
+```
+
+### Upgrade an existing Bench to the pinned LMS release
+
+The first production installation used LMS v2.54.2. Upgrade it to the tested
+v2.60.1 tag to enable the redesigned **Course editor**:
+
+```bash
+cd "$HOME/frappe/learning-bench"
+bench --site biqat.localhost backup --with-files --compress
+
+git -C apps/lms fetch --depth=1 upstream tag v2.60.1
+git -C apps/lms checkout --detach v2.60.1
+git -C apps/biqat_lms pull --ff-only upstream main
+
+bench setup requirements lms biqat_lms
+bench --site biqat.localhost migrate
+NODE_OPTIONS=--max-old-space-size=4096 bench build --app lms
+bench build --app biqat_lms
+bench --site biqat.localhost clear-cache
+bench restart
 ```
 
 Production processes are managed by Supervisor and web traffic is served by
@@ -207,13 +231,13 @@ files.
 
 ## Fresh Bench installation
 
-This app targets Frappe Framework v15 and Frappe Learning v2.54.2. Install its
+This app targets Frappe Framework v15 and Frappe Learning v2.60.1. Install its
 upstream dependencies first:
 
 ```bash
 cd "$PATH_TO_YOUR_BENCH"
 bench get-app --branch version-15 payments https://github.com/frappe/payments.git
-bench get-app --branch v2.54.2 lms https://github.com/frappe/lms.git
+bench get-app --branch v2.60.1 lms https://github.com/frappe/lms.git
 bench get-app --branch main biqat_lms https://github.com/AbewAbew/biqatLms.git
 
 bench --site "$SITE_NAME" install-app payments

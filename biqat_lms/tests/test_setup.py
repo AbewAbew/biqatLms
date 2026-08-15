@@ -1,10 +1,9 @@
-from unittest.mock import patch
-
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from lms import __version__ as lms_version
+from packaging.version import Version
 
 from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list
-from biqat_lms.branding import get_branding
 from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
 	CHAPA_GATEWAY,
@@ -20,6 +19,7 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		installed_apps = set(frappe.get_installed_apps())
 
 		self.assertTrue({"biqat_lms", "lms", "payments"}.issubset(installed_apps))
+		self.assertGreaterEqual(Version(lms_version), Version("2.60.1"))
 
 	def test_ethiopian_payment_defaults_are_installed(self):
 		configure_ethiopian_payments()
@@ -94,18 +94,3 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		self.assertEqual(customized_html.count(CUSTOMIZATION_SCRIPT), 1)
 		self.assertLess(customized_html.index(CUSTOMIZATION_SCRIPT), customized_html.index("app.js"))
 		self.assertEqual(inject_customization_script(customized_html), customized_html)
-
-	def test_branding_images_are_returned_as_urls(self):
-		values = {
-			"app_name": "Biqat Learning",
-			"banner_image": "/files/biqat-logo.png",
-			"footer_logo": None,
-			"favicon": "/files/biqat-favicon.png",
-			"app_logo": "/files/biqat-logo.png",
-		}
-		with patch("frappe.get_cached_value", side_effect=lambda _dt, _dn, field: values[field]):
-			branding = get_branding()
-
-		self.assertEqual(branding.banner_image, "/files/biqat-logo.png")
-		self.assertEqual(branding.favicon, "/files/biqat-favicon.png")
-		self.assertIsInstance(branding.banner_image, str)

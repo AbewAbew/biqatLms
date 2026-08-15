@@ -153,7 +153,6 @@ doc_events = {
 # selected for the Biqat LMS administrator interface.
 override_whitelisted_methods = {
 	"frappe.client.get_list": "biqat_lms.api.get_list",
-	"lms.lms.api.get_branding": "biqat_lms.branding.get_branding",
 }
 
 # Scheduled Tasks
