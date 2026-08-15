@@ -30,13 +30,15 @@ show their name publicly.
 
 ## Create an instructor profile
 
-An Administrator or System Manager can open:
+An Administrator, System Manager or LMS Moderator can manage profiles without
+leaving the LMS:
 
-```text
-/app/biqat-instructor-profile/new
-```
+1. Open **Settings → Users**.
+2. Find **Instructor profiles** and select **Manage instructors**.
+3. Select **New instructor** or edit an existing instructor.
 
-Alternatively, search for **Biqat Instructor Profile** from the Frappe Desk.
+The Desk **Biqat Instructor Profile** form remains available as an advanced
+fallback.
 
 Complete the following fields:
 
@@ -55,8 +57,18 @@ students.
 
 ## Assign the instructor to courses
 
-In the profile's **Course Attribution** table, add each relevant course and
-choose the public role:
+When creating a course or editing its **Settings** tab:
+
+1. Select the external teacher under **Instructor**.
+2. The selection saves automatically. New-course selections are applied when
+   the course is created.
+
+The internal course-editor relation is intentionally hidden in the Biqat LMS.
+Frappe retains the logged-in Biqat administrator as the editor automatically,
+while only the managed teacher is presented in the course form and to learners.
+
+For advanced attribution, the profile's Desk **Course Attribution** table also
+allows the following public roles:
 
 - Lead Instructor
 - Instructor

@@ -1,8 +1,10 @@
+import json
 from typing import Any
 
 import frappe
+from frappe import _
 from frappe.client import get_list as frappe_get_list
-from frappe.utils import escape_html
+from frappe.utils import cint, escape_html
 from lms.lms.api import get_profile_details as lms_get_profile_details
 from lms.lms.utils import (
 	can_modify_course,
@@ -17,6 +19,20 @@ from lms.lms.utils import (
 
 ALLOWED_PAYMENT_GATEWAY_SETTINGS = {"Chapa Settings", "Mpesa Settings"}
 EXPERT_USERNAME_PREFIX = "expert-"
+INSTRUCTOR_MANAGER_ROLES = {"Moderator", "System Manager"}
+INSTRUCTOR_PROFILE_FIELDS = (
+	"name",
+	"full_name",
+	"profile_slug",
+	"enabled",
+	"professional_title",
+	"organization",
+	"contact_email",
+	"linkedin",
+	"profile_image",
+	"cover_image",
+	"biography",
+)
 
 
 @frappe.whitelist()
@@ -116,6 +132,162 @@ def get_course_experts(course: str):
 	if not lms_get_course_details(course):
 		return []
 	return get_course_experts_map([course]).get(course, [])
+
+
+@frappe.whitelist()
+def list_instructor_profiles(search: str | None = None, course: str | None = None):
+	"""List managed instructor profiles for the LMS-native management controls."""
+	_require_instructor_manager()
+	if search is not None and not isinstance(search, str):
+		frappe.throw(_("Invalid search query."), frappe.ValidationError)
+
+	filters = {}
+	or_filters = None
+	if search:
+		term = f"%{search.strip()}%"
+		or_filters = {
+			"full_name": ["like", term],
+			"professional_title": ["like", term],
+			"organization": ["like", term],
+		}
+
+	profiles = frappe.get_all(
+		"Biqat Instructor Profile",
+		filters=filters,
+		or_filters=or_filters,
+		fields=list(INSTRUCTOR_PROFILE_FIELDS),
+		order_by="enabled desc, full_name asc",
+		limit_page_length=200,
+	)
+	selected = set()
+	if course:
+		_validate_course(course)
+		selected = set(
+			frappe.get_all(
+				"Biqat Instructor Course",
+				filters={
+					"course": course,
+					"parenttype": "Biqat Instructor Profile",
+					"parentfield": "courses",
+				},
+				pluck="parent",
+			)
+		)
+
+	for profile in profiles:
+		profile.selected = profile.name in selected
+	return profiles
+
+
+@frappe.whitelist()
+def save_instructor_profile(profile: str | dict):
+	"""Create or update a managed instructor without creating a login account."""
+	_require_instructor_manager()
+	values = json.loads(profile) if isinstance(profile, str) else profile
+	if not isinstance(values, dict):
+		frappe.throw(_("Invalid instructor profile."), frappe.ValidationError)
+
+	name = values.get("name")
+	if name:
+		doc = frappe.get_doc("Biqat Instructor Profile", name)
+	else:
+		doc = frappe.new_doc("Biqat Instructor Profile")
+
+	for fieldname in INSTRUCTOR_PROFILE_FIELDS:
+		if fieldname in {"name", "profile_slug"} or fieldname not in values:
+			continue
+		setattr(doc, fieldname, values[fieldname])
+
+	doc.full_name = (doc.full_name or "").strip()
+	if not doc.full_name:
+		frappe.throw(_("Full name is required."), frappe.ValidationError)
+
+	if doc.is_new():
+		doc.insert()
+	else:
+		doc.save()
+	return frappe.get_doc("Biqat Instructor Profile", doc.name).as_dict()
+
+
+@frappe.whitelist()
+def set_instructor_profile_status(profile: str, enabled: int | str = 1):
+	"""Enable or disable a managed instructor profile from the LMS Users panel."""
+	_require_instructor_manager()
+	doc = frappe.get_doc("Biqat Instructor Profile", profile)
+	doc.enabled = cint(enabled)
+	doc.save()
+	return {"name": doc.name, "enabled": doc.enabled}
+
+
+@frappe.whitelist()
+def set_course_instructor_profiles(course: str, profiles: str | list[str] | None = None):
+	"""Replace public instructor attribution for a course without changing its editors."""
+	_require_course_manager(course)
+	profile_names = json.loads(profiles) if isinstance(profiles, str) else (profiles or [])
+	if not isinstance(profile_names, list) or any(not isinstance(name, str) for name in profile_names):
+		frappe.throw(_("Invalid instructor selection."), frappe.ValidationError)
+
+	profile_names = list(dict.fromkeys(profile_names))
+	if profile_names:
+		valid_profiles = set(
+			frappe.get_all(
+				"Biqat Instructor Profile",
+				filters={"name": ["in", profile_names], "enabled": 1},
+				pluck="name",
+			)
+		)
+		missing = [name for name in profile_names if name not in valid_profiles]
+		if missing:
+			frappe.throw(
+				_("These instructor profiles are unavailable: {0}").format(", ".join(missing)),
+				frappe.ValidationError,
+			)
+
+	existing_profiles = set(
+		frappe.get_all(
+			"Biqat Instructor Course",
+			filters={
+				"course": course,
+				"parenttype": "Biqat Instructor Profile",
+				"parentfield": "courses",
+			},
+			pluck="parent",
+		)
+	)
+	profiles_to_update = existing_profiles | set(profile_names)
+	for profile_name in profiles_to_update:
+		doc = frappe.get_doc("Biqat Instructor Profile", profile_name)
+		doc.set("courses", [row for row in doc.courses if row.course != course])
+		if profile_name in profile_names:
+			doc.append(
+				"courses",
+				{
+					"course": course,
+					"role": _("Instructor"),
+					"display_order": (profile_names.index(profile_name) + 1) * 10,
+				},
+			)
+		doc.save()
+
+	return get_course_experts_map([course]).get(course, [])
+
+
+def _require_instructor_manager():
+	if frappe.session.user == "Administrator":
+		return
+	if not INSTRUCTOR_MANAGER_ROLES.intersection(frappe.get_roles()):
+		frappe.throw(_("You do not have permission to manage instructor profiles."), frappe.PermissionError)
+
+
+def _require_course_manager(course: str):
+	_validate_course(course)
+	if not can_modify_course(course):
+		frappe.throw(_("You do not have permission to modify this course."), frappe.PermissionError)
+
+
+def _validate_course(course: str):
+	if not isinstance(course, str) or not frappe.db.exists("LMS Course", course):
+		frappe.throw(_("Course not found."), frappe.DoesNotExistError)
 
 
 @frappe.whitelist()

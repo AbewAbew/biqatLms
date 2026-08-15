@@ -2,7 +2,14 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from lms.lms.utils import can_modify_course
 
-from biqat_lms.api import get_course_details, get_course_experts_map, get_profile_details
+from biqat_lms.api import (
+	get_course_details,
+	get_course_experts_map,
+	get_profile_details,
+	list_instructor_profiles,
+	save_instructor_profile,
+	set_course_instructor_profiles,
+)
 
 
 class TestBiqatInstructorProfile(FrappeTestCase):
@@ -97,3 +104,49 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		)
 		with self.assertRaises(frappe.ValidationError):
 			self.profile.save(ignore_permissions=True)
+
+	def test_manager_can_create_and_edit_profile_from_lms_api(self):
+		created = save_instructor_profile(
+			{
+				"full_name": "W/ro Selam Example",
+				"professional_title": "Mediator",
+				"organization": "Biqat Faculty Network",
+				"contact_email": "selam@example.com",
+				"biography": "<p>Accredited mediator.</p>",
+			}
+		)
+		self.assertTrue(created.name)
+		self.assertFalse(frappe.db.exists("User", "selam@example.com"))
+
+		updated = save_instructor_profile(
+			{"name": created.name, "full_name": "W/ro Selam Example", "professional_title": "Lead Mediator"}
+		)
+		self.assertEqual(updated.professional_title, "Lead Mediator")
+
+		profiles = list_instructor_profiles(search="Selam")
+		self.assertEqual([profile.name for profile in profiles], [created.name])
+
+	def test_course_profile_api_changes_attribution_without_edit_access(self):
+		second_profile = save_instructor_profile(
+			{
+				"full_name": "Ato Bekele Example",
+				"professional_title": "Arbitrator",
+			}
+		)
+
+		set_course_instructor_profiles(self.course.name, [second_profile.name])
+		course_doc = frappe.get_doc("LMS Course", self.course.name)
+		self.assertEqual([row.instructor for row in course_doc.instructors], ["Administrator"])
+
+		profiles = list_instructor_profiles(course=self.course.name)
+		selected = [profile.name for profile in profiles if profile.selected]
+		self.assertEqual(selected, [second_profile.name])
+		self.assertEqual(
+			get_course_experts_map([self.course.name])[self.course.name][0].full_name,
+			"Ato Bekele Example",
+		)
+
+	def test_student_cannot_manage_profiles(self):
+		frappe.set_user(self.student_email)
+		with self.assertRaises(frappe.PermissionError):
+			list_instructor_profiles()
