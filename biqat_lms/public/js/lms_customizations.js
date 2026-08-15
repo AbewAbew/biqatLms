@@ -1,4 +1,6 @@
 const INDIA_GST_LABEL = "Apply GST for India";
+const COURSE_CREATOR_LABEL = "Course creator";
+const MANAGED_INSTRUCTOR_LABEL = "Instructor";
 const BRANDING_ENDPOINT = "/api/method/lms.lms.api.get_branding";
 const LMS_ONBOARDING_KEY_PREFIX = "isOnboardingStepsCompletedlearning";
 const BRANDING_CACHE_VERSION = "10";
@@ -236,6 +238,16 @@ function hideUpstreamFrappeUi() {
 	}
 }
 
+function relabelManagedInstructorCards() {
+	for (const label of document.querySelectorAll(
+		".uppercase.text-ink-gray-5.text-xs-semibold.tracking-wider"
+	)) {
+		if (label.textContent.trim() === COURSE_CREATOR_LABEL) {
+			label.textContent = MANAGED_INSTRUCTOR_LABEL;
+		}
+	}
+}
+
 function getStoredSidebarLanguage() {
 	try {
 		return localStorage.getItem(SIDEBAR_LANGUAGE_STORAGE_KEY) === "en" ? "en" : "am";
@@ -340,6 +352,7 @@ const observer = new MutationObserver(() => {
 	queueMicrotask(() => {
 		hideIndiaGstControl();
 		hideUpstreamFrappeUi();
+		relabelManagedInstructorCards();
 		applySidebarLanguage();
 		repairBrandingImages();
 		updateScheduled = false;
@@ -351,6 +364,7 @@ const headObserver = new MutationObserver(() => repairBrandingImages());
 function initializeDomCustomizations() {
 	hideIndiaGstControl();
 	hideUpstreamFrappeUi();
+	relabelManagedInstructorCards();
 	applySidebarLanguage();
 	repairBrandingImages();
 	observer.observe(document.body, { childList: true, subtree: true });

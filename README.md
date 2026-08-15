@@ -100,6 +100,18 @@ Frappe Learning is pinned to v2.60.1. The older v2.54.2 release did not include
 the **Course editor** tab; the pinned release includes the redesigned chapter
 and lesson editor used by course instructors and moderators.
 
+## Managed instructor publishing
+
+Biqat separates public instructor attribution from Frappe Learning's internal
+course-editor relationship. Administrators can create independent instructor
+profiles with biographies, photographs, professional titles and course
+assignments without creating User accounts or granting course modification
+access. Students see those experts on course cards, course pages and read-only
+profile pages, while Biqat retains editorial control.
+
+The operating procedure is documented in
+[`docs/MANAGED_INSTRUCTOR_WORKFLOW.md`](docs/MANAGED_INSTRUCTOR_WORKFLOW.md).
+
 ## Onboarding and help
 
 Frappe Learning's stock **Getting started** popup and its link to the upstream
@@ -127,6 +139,10 @@ backups.
 
 ## Google Cloud production VM
 
+The completed Cloudflare DNS and HTTPS cutover, including verification and
+rollback instructions, is documented in
+[`docs/DOMAIN_CUTOVER.md`](docs/DOMAIN_CUTOVER.md).
+
 The current production host was prepared as follows:
 
 - VM name: `biqat-lms-prod`
@@ -135,7 +151,7 @@ The current production host was prepared as follows:
 - Deployment type: native Frappe Bench, without Docker
 - Bench path: `$HOME/frappe/learning-bench`
 - Internal site name: `biqat.localhost`
-- Temporary access: public IPv4 over HTTP
+- Public address: `https://biqat.lexprime.et/lms`
 - SSH access: Google Cloud IAP, restricted to TCP port 22 from
   `35.235.240.0/20`
 
@@ -275,9 +291,6 @@ sudo tail -n 100 /var/log/nginx/error.log
 
 Before public launch:
 
-- Reserve the VM's external IPv4 address so it does not change.
-- Purchase or select a domain, point its DNS record to the VM, and enable
-  trusted HTTPS.
 - Configure automated encrypted backups and copy them off the VM.
 - Test recovery from a backup.
 - Install and verify the patched wkhtmltopdf build required for PDF output.
