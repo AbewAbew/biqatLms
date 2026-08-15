@@ -18,6 +18,9 @@ from lms.lms.utils import (
 from lms.lms.utils import (
 	get_courses as lms_get_courses,
 )
+from lms.lms.utils import (
+	get_program_details as lms_get_program_details,
+)
 
 ALLOWED_PAYMENT_GATEWAY_SETTINGS = {"Chapa Settings", "Mpesa Settings"}
 EXPERT_USERNAME_PREFIX = "expert-"
@@ -152,6 +155,24 @@ def get_my_courses():
 		if experts:
 			course.instructors = experts
 	return courses
+
+
+@frappe.whitelist()
+def get_program_details(program_name: str):
+	"""Return Program course cards with their public instructors."""
+	program = lms_get_program_details(program_name)
+	if not program:
+		return program
+
+	courses = program.get("courses") or []
+	experts_by_course = get_course_experts_map([course.name for course in courses])
+	for course in courses:
+		experts = experts_by_course.get(course.name, [])
+		course.biqat_experts = experts
+		if experts:
+			course.instructors = experts
+
+	return program
 
 
 @frappe.whitelist(allow_guest=True)

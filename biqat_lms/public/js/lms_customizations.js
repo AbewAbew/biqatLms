@@ -519,20 +519,25 @@ function translateSidebarLabels(sidebar) {
 		}
 
 		const currentLabel = element.textContent.trim();
-		let sourceLabel = element.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
-		if (!sourceLabel) {
-			sourceLabel = Object.hasOwn(SIDEBAR_TRANSLATIONS, currentLabel)
-				? currentLabel
-				: amharicToEnglish[currentLabel];
-			if (!sourceLabel) continue;
-			element.setAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE, sourceLabel);
+		if (sidebarLanguage === "en") {
+			const englishLabel = amharicToEnglish[currentLabel];
+			if (englishLabel) element.textContent = englishLabel;
+			element.removeAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
+			continue;
 		}
 
-		const desiredLabel =
-			sidebarLanguage === "am" ? SIDEBAR_TRANSLATIONS[sourceLabel] : sourceLabel;
-		if (desiredLabel && currentLabel !== desiredLabel) {
-			element.textContent = desiredLabel;
-		}
+		// Vue reuses sidebar DOM nodes when a user's visible links change. Prefer
+		// the newly rendered English label over a source attribute from the old
+		// node so labels never become detached from their button's actual route.
+		let sourceLabel = Object.hasOwn(SIDEBAR_TRANSLATIONS, currentLabel)
+			? currentLabel
+			: element.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE) ||
+			  amharicToEnglish[currentLabel];
+		if (!sourceLabel || !SIDEBAR_TRANSLATIONS[sourceLabel]) continue;
+
+		element.setAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE, sourceLabel);
+		const desiredLabel = SIDEBAR_TRANSLATIONS[sourceLabel];
+		if (currentLabel !== desiredLabel) element.textContent = desiredLabel;
 	}
 }
 

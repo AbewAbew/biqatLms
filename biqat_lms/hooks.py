@@ -158,6 +158,7 @@ override_whitelisted_methods = {
 	"lms.lms.api.get_profile_details": "biqat_lms.api.get_profile_details",
 	"lms.lms.utils.get_course_details": "biqat_lms.api.get_course_details",
 	"lms.lms.utils.get_courses": "biqat_lms.api.get_courses",
+	"lms.lms.utils.get_program_details": "biqat_lms.api.get_program_details",
 }
 
 # Scheduled Tasks

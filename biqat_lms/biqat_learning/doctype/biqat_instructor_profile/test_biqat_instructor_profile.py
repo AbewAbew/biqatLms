@@ -10,6 +10,7 @@ from biqat_lms.api import (
 	get_created_courses,
 	get_my_courses,
 	get_profile_details,
+	get_program_details,
 	list_instructor_profiles,
 	save_instructor_profile,
 	set_course_instructor_profiles,
@@ -128,6 +129,21 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 
 		self.assertEqual(courses[0].instructors[0].full_name, self.profile.full_name)
 		self.assertEqual(courses[0].membership.progress, 25)
+
+	def test_student_program_course_card_uses_public_instructor(self):
+		stock_course = frappe._dict(
+			{
+				"name": self.course.name,
+				"instructors": [frappe._dict({"name": "Administrator", "full_name": "Administrator"})],
+			}
+		)
+		stock_program = frappe._dict({"name": "Legal Program", "courses": [stock_course]})
+		frappe.set_user(self.student_email)
+		with patch("biqat_lms.api.lms_get_program_details", return_value=stock_program):
+			program = get_program_details("Legal Program")
+
+		self.assertEqual(program.courses[0].instructors[0].full_name, self.profile.full_name)
+		self.assertEqual(program.courses[0].biqat_experts[0].profile_name, self.profile.name)
 
 	def test_duplicate_course_assignment_is_rejected(self):
 		self.profile.append(
