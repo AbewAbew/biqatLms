@@ -84,11 +84,15 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		self.assertEqual({row.name for row in gateways}, ALLOWED_PAYMENT_GATEWAY_SETTINGS)
 
 	def test_lms_page_includes_ui_customization(self):
-		html = "<html><body><div id='app'></div></body></html>"
+		html = (
+			"<html><head><script type='module' src='/assets/lms/app.js'></script></head>"
+			"<body><div id='app'></div></body></html>"
+		)
 		customized_html = inject_customization_script(html)
 
 		self.assertIn(CUSTOMIZATION_SCRIPT, customized_html)
 		self.assertEqual(customized_html.count(CUSTOMIZATION_SCRIPT), 1)
+		self.assertLess(customized_html.index(CUSTOMIZATION_SCRIPT), customized_html.index("app.js"))
 		self.assertEqual(inject_customization_script(customized_html), customized_html)
 
 	def test_branding_images_are_returned_as_urls(self):

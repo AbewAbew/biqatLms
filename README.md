@@ -93,7 +93,16 @@ Biqat normalizes the LMS branding API to return logo and favicon values as
 plain `/files/...` URLs. A small LMS-page compatibility script preserves those
 URLs when the stock Branding form saves them. This prevents the stock LMS
 object-versus-string mismatch from clearing a new upload or breaking the image
-preview after a reload.
+preview after a reload. It also repairs the stock sidebar's incompatible
+`banner_image.file_url` lookup and cache-busts favicon updates, so a newly
+uploaded Biqat logo replaces the old Frappe icon.
+
+## Onboarding and help
+
+Frappe Learning's stock **Getting started** popup and its link to the upstream
+Frappe Help Centre are disabled. The server-side onboarding status is left
+untouched so this area can later be replaced with Biqat's own setup steps and
+user manual.
 
 ## GitHub workflow
 
