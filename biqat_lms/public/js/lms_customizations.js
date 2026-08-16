@@ -419,11 +419,29 @@ async function apiCall(method, args = {}) {
 	});
 	const payload = await response.json().catch(() => ({}));
 	if (!response.ok || payload.exc) {
-		throw new Error(
-			payload._error_message || payload.message || `Request failed (${response.status})`
-		);
+		throw new Error(extractErrorMessage(payload) || `Request failed (${response.status})`);
 	}
 	return payload.message;
+}
+
+function extractErrorMessage(payload) {
+	if (payload._error_message) return payload._error_message;
+	if (payload._server_messages) {
+		try {
+			const serverMessages = JSON.parse(payload._server_messages).map((entry) =>
+				JSON.parse(entry)
+			);
+			const text = serverMessages
+				.map((entry) => entry.message)
+				.filter(Boolean)
+				.join(" ");
+			if (text) return text;
+		} catch {
+			// fall through to other fields
+		}
+	}
+	if (typeof payload.message === "string") return payload.message;
+	return null;
 }
 
 async function captureNewInstructorProfiles(resource, options, responsePromise) {

@@ -22,6 +22,7 @@ from biqat_lms.api import (
 	set_batch_instructor_profiles,
 	set_course_instructor_profiles,
 )
+from biqat_lms.setup.instructor_profiles import prune_orphaned_instructor_attributions
 from biqat_lms.setup.programs import sync_program_member_counts
 
 
@@ -316,6 +317,57 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 
 		self.assertEqual(details.instructors[0].full_name, self.profile.full_name)
 		self.assertEqual(details.biqat_experts[0].profile_name, self.profile.name)
+
+	def _create_and_orphan_batch(self):
+		"""Create, attribute, then hard-delete a batch, leaving a dangling link behind.
+
+		Mirrors production: a batch was deleted after being attributed to a
+		profile, and Document.save() validates every Link field on the whole
+		document, so the dangling row silently blocked all later saves.
+		"""
+		orphan_batch = frappe.get_doc(
+			{
+				"doctype": "LMS Batch",
+				"title": f"Orphan Batch {frappe.generate_hash(length=8)}",
+				"description": "Deleted after attribution to simulate a dangling link.",
+				"batch_details": "Temporary batch for the orphaned-link regression test.",
+				"start_date": add_days(nowdate(), 1),
+				"end_date": add_days(nowdate(), 2),
+				"start_time": "10:00:00",
+				"end_time": "11:00:00",
+				"timezone": "Africa/Addis_Ababa",
+				"medium": "Online",
+			}
+		).insert(ignore_permissions=True)
+		self.profile.append(
+			"batches",
+			{"batch": orphan_batch.name, "role": "Instructor", "display_order": 5},
+		)
+		self.profile.save(ignore_permissions=True)
+
+		frappe.db.delete("LMS Batch", {"name": orphan_batch.name})
+		frappe.db.delete("Course Instructor", {"parent": orphan_batch.name})
+		return orphan_batch.name
+
+	def test_stale_batch_link_does_not_block_new_attribution(self):
+		orphan_batch_name = self._create_and_orphan_batch()
+
+		set_batch_instructor_profiles(self.batch.name, [self.profile.name])
+
+		self.assertEqual(
+			get_batch_experts_map([self.batch.name])[self.batch.name][0].full_name,
+			self.profile.full_name,
+		)
+		remaining_batches = frappe.get_doc("Biqat Instructor Profile", self.profile.name).batches
+		self.assertNotIn(orphan_batch_name, [row.batch for row in remaining_batches])
+
+	def test_migration_repair_prunes_stale_attribution_links(self):
+		orphan_batch_name = self._create_and_orphan_batch()
+
+		prune_orphaned_instructor_attributions()
+
+		remaining_batches = frappe.get_doc("Biqat Instructor Profile", self.profile.name).batches
+		self.assertNotIn(orphan_batch_name, [row.batch for row in remaining_batches])
 
 	def test_student_cannot_manage_profiles(self):
 		frappe.set_user(self.student_email)

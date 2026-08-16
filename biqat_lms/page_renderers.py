@@ -1,7 +1,7 @@
 from frappe.website.page_renderers.base_renderer import BaseRenderer
 from frappe.website.page_renderers.template_page import TemplatePage
 
-CUSTOMIZATION_SCRIPT = '<script src="/assets/biqat_lms/js/lms_customizations.js?v=24"></script>'
+CUSTOMIZATION_SCRIPT = '<script src="/assets/biqat_lms/js/lms_customizations.js?v=25"></script>'
 
 
 class BiqatLMSRenderer(BaseRenderer):

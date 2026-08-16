@@ -37,6 +37,7 @@ from lms.lms.utils import (
 	get_program_details as lms_get_program_details,
 )
 
+from biqat_lms.setup.instructor_profiles import valid_link_names
 from biqat_lms.setup.programs import sync_program_member_count
 
 ALLOWED_PAYMENT_GATEWAY_SETTINGS = {"Chapa Settings", "Mpesa Settings"}
@@ -387,7 +388,11 @@ def set_course_instructor_profiles(course: str, profiles: str | list[str] | None
 	profiles_to_update = existing_profiles | set(profile_names)
 	for profile_name in profiles_to_update:
 		doc = frappe.get_doc("Biqat Instructor Profile", profile_name)
-		doc.set("courses", [row for row in doc.courses if row.course != course])
+		valid_courses = valid_link_names("LMS Course", [row.course for row in doc.courses])
+		doc.set(
+			"courses",
+			[row for row in doc.courses if row.course != course and row.course in valid_courses],
+		)
 		if profile_name in profile_names:
 			doc.append(
 				"courses",
@@ -439,7 +444,11 @@ def set_batch_instructor_profiles(batch: str, profiles: str | list[str] | None =
 	)
 	for profile_name in existing_profiles | set(profile_names):
 		doc = frappe.get_doc("Biqat Instructor Profile", profile_name)
-		doc.set("batches", [row for row in doc.batches if row.batch != batch])
+		valid_batches = valid_link_names("LMS Batch", [row.batch for row in doc.batches])
+		doc.set(
+			"batches",
+			[row for row in doc.batches if row.batch != batch and row.batch in valid_batches],
+		)
 		if profile_name in profile_names:
 			doc.append(
 				"batches",

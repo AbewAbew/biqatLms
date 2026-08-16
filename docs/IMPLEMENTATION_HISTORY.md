@@ -661,6 +661,32 @@ The reusable instructor profile picker also closes on outside clicks in event
 capture phase, and the profile manager uses Frappe surface tokens so it follows
 both light and dark themes.
 
+### 12.5 A deleted course or batch could permanently wedge a profile's attribution
+
+`frappe.model.Document.save()` validates every Link field on the whole
+document, not just the rows being changed. A profile that had ever been
+attributed to a course or batch which was later deleted therefore kept one
+dangling row in its `courses` or `batches` child table, and every future
+`set_course_instructor_profiles` / `set_batch_instructor_profiles` call for
+that profile failed with `frappe.exceptions.LinkValidationError: Could not
+find Row #N` — surfaced to the browser as an opaque `417` from
+`lms_customizations.js`, and observed in production as an instructor
+selection that silently never saved, leaving the internal editor
+(`Administrator`) visible on the batch card instead.
+
+`biqat_lms/setup/instructor_profiles.py` adds `valid_link_names()` and
+`prune_orphaned_instructor_attributions()`. The API layer now drops dead rows
+for the profile being edited before every save (self-healing on the next
+edit), and `after_migrate` runs the same repair across every profile so an
+existing production instance recovers on its next `bench migrate` without
+manual data surgery.
+
+The `lms_customizations.js` `apiCall()` helper also only ever surfaced a
+generic `Request failed (417)` on any backend validation error, because
+Frappe returns thrown messages in `_server_messages`, not in the `message` or
+`_error_message` fields the helper checked. It now parses `_server_messages`
+so future validation failures show their real reason in the alert.
+
 ## 13. Programs and learner enrollment
 
 Programs and Batches are different concepts:
@@ -973,6 +999,26 @@ rebuild the LMS frontend and clear browser cache.
 Confirm an enabled Biqat Instructor Profile is assigned to the course, migrate
 the custom app, clear cache, and verify the latest `biqat_lms` commit is
 deployed.
+
+### Selecting an instructor fails with a `417` error, and the batch/course card still shows the internal editor
+
+Run `bench --site biqat.localhost migrate`. This was caused by a profile
+carrying a dangling `courses`/`batches` row left behind by a deleted course or
+batch (see section 12.5); `after_migrate` now repairs it automatically. If it
+recurs, confirm with:
+
+```bash
+bench --site biqat.localhost execute frappe.get_all \
+  --kwargs '{"doctype":"Biqat Instructor Profile","fields":["name","full_name","enabled"]}'
+```
+
+then reproduce the failing save directly to get the real traceback instead of
+the browser's generic `417`:
+
+```bash
+bench --site biqat.localhost execute biqat_lms.api.set_batch_instructor_profiles \
+  --kwargs '{"batch":"<batch-name>","profiles":["<profile-name>"]}'
+```
 
 ### Program still displays zero members
 

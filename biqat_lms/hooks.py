@@ -92,6 +92,7 @@ after_install = "biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults
 after_migrate = [
 	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
 	"biqat_lms.setup.programs.sync_program_member_counts",
+	"biqat_lms.setup.instructor_profiles.prune_orphaned_instructor_attributions",
 ]
 
 # Uninstallation
