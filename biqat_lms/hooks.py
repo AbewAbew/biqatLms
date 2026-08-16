@@ -138,9 +138,9 @@ after_migrate = [
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"LMS Live Class": "biqat_lms.overrides.lms_live_class.BiqatLMSLiveClass",
+}
 
 # Document Events
 # ---------------

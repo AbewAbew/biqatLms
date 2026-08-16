@@ -893,6 +893,15 @@ Batch. An explicitly submitted timezone is still respected. This keeps Google
 Calendar and Meet scheduling aligned with the administrator's Batch settings
 and avoids making the administrator choose the same timezone twice.
 
+The stock LMS also treats Frappe User document names as attendee email
+addresses. This fails for the built-in system account because its document name
+is `Administrator`, not an email address, and Google Calendar returns `Invalid
+attendee email` with HTTP 400. Biqat overrides the `LMS Live Class` document
+class and resolves every participant through the User record's `email` field.
+Syntactically invalid and duplicate addresses are excluded. Managed instructor
+profiles remain public course/batch attribution only and are not turned into
+Calendar attendees or login accounts.
+
 Use a hard refresh (`Ctrl+Shift+R`) after frontend changes. If a PWA service
 worker still serves an old bundle, clear the site's browser storage and reload.
 

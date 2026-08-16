@@ -5,6 +5,7 @@ from packaging.version import Version
 
 import biqat_lms.hooks as biqat_hooks
 from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list
+from biqat_lms.overrides.lms_live_class import BiqatLMSLiveClass
 from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
 	CHAPA_GATEWAY,
@@ -106,3 +107,10 @@ class TestBiqatLMSSetup(FrappeTestCase):
 			],
 			"biqat_lms.api.create_google_meet_live_class",
 		)
+
+	def test_live_class_uses_email_safe_doctype_override(self):
+		self.assertEqual(
+			biqat_hooks.override_doctype_class["LMS Live Class"],
+			"biqat_lms.overrides.lms_live_class.BiqatLMSLiveClass",
+		)
+		self.assertIsInstance(frappe.new_doc("LMS Live Class"), BiqatLMSLiveClass)
