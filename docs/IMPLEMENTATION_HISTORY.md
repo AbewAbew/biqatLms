@@ -687,20 +687,31 @@ Frappe returns thrown messages in `_server_messages`, not in the `message` or
 `_error_message` fields the helper checked. It now parses `_server_messages`
 so future validation failures show their real reason in the alert.
 
-### 12.6 The stock course-publish broadcast is forced off
+### 12.6 The course-publish broadcast is patched to credit the managed instructor
 
 `lms.lms.doctype.lms_course.lms_course.send_notification_for_published_courses`
 runs daily via the LMS scheduler whenever `LMS Settings.send_notification_for_published_courses`
-is set, and credits the internal editor (e.g. `Administrator`) by name in a
-message broadcast to every enabled user — not the managed instructor. That
-function is a plain scheduled job, not a whitelisted API method, so it cannot
-be intercepted with `override_whitelisted_methods` the way course, batch, and
-certificate data are elsewhere in this app.
+is set to `Email` or `In-app`. Upstream, both branches credit the internal
+editor (e.g. `Administrator`) by name instead of the managed instructor. The
+`Email` branch is also independently broken: it sends the message *to* the
+internal `Course Instructor` accounts (a list of raw dicts, not even valid
+recipient addresses) and only BCCs students, rather than the other way
+around.
 
-`biqat_lms.setup.site_defaults.disable_course_publish_broadcast()` forces the
-setting back off on every `after_install`/`after_migrate`, so an administrator
-exploring LMS Settings can turn it on but the next deployment turns it back
-off before it can leak the internal editor's identity.
+Neither branch is a whitelisted API method, so `override_whitelisted_methods`
+cannot intercept them. `biqat_lms/overrides/lms_course.py` replaces both
+directly on the `lms.lms.doctype.lms_course.lms_course` module at import
+time — the only option available, since `send_notification_for_published_courses`
+calls them as bare module-level names. `biqat_lms.hooks` triggers the patch
+at the top of the file (`_lms_course_patch.apply()`) rather than inside
+`override_whitelisted_methods`, since it must run before the scheduler
+resolves the call, not in response to an API request.
+
+The replacements: credit the batch's actual `Biqat Instructor Course`
+attribution (falling back to `"{brand name} Faculty"`, never the internal
+editor, if none is set), and correctly address the email to enrolled/enabled
+users rather than the internal editor. The setting itself is left alone —
+administrators still control it from LMS Settings exactly as before.
 
 ## 13. Programs and learner enrollment
 

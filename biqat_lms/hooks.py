@@ -143,6 +143,15 @@ override_doctype_class = {
 	"LMS Live Class": "biqat_lms.overrides.lms_live_class.BiqatLMSLiveClass",
 }
 
+# lms.lms.doctype.lms_course.lms_course.send_notification_for_published_courses is
+# a plain scheduled job, not a whitelisted method, so override_whitelisted_methods
+# can't intercept it. Patch its two branches directly at import time instead, so
+# the "course published" broadcast credits the managed instructor rather than the
+# internal editor.
+from biqat_lms.overrides import lms_course as _lms_course_patch  # noqa: E402
+
+_lms_course_patch.apply()
+
 # Document Events
 # ---------------
 # Hook on document methods and events

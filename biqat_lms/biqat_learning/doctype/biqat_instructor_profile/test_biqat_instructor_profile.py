@@ -353,6 +353,35 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		self.assertIn(self.student_email, by_email)
 		self.assertFalse(frappe.db.exists("User", {"email": self.instructor_email}))
 
+	def test_course_publish_broadcast_credits_managed_instructor(self):
+		from lms.lms.doctype.lms_course.lms_course import send_notification_for_published_courses
+
+		frappe.db.set_single_value("LMS Settings", "send_notification_for_published_courses", "In-app")
+
+		with patch("biqat_lms.overrides.lms_course.make_notification_logs") as make_notification_logs:
+			send_notification_for_published_courses()
+
+		self.assertTrue(make_notification_logs.called)
+		notification = make_notification_logs.call_args[0][0]
+		self.assertIn(self.profile.full_name, notification.subject)
+		self.assertNotIn("Administrator", notification.subject)
+		self.assertEqual(frappe.db.get_value("LMS Course", self.course.name, "notification_sent"), 1)
+
+	def test_course_publish_broadcast_email_targets_students_not_instructors(self):
+		from lms.lms.doctype.lms_course.lms_course import send_notification_for_published_courses
+
+		frappe.db.set_single_value("LMS Settings", "send_notification_for_published_courses", "Email")
+
+		with patch("frappe.sendmail") as sendmail:
+			send_notification_for_published_courses()
+
+		self.assertTrue(sendmail.called)
+		call_kwargs = sendmail.call_args.kwargs
+		self.assertIn(self.student_email, call_kwargs["recipients"])
+		self.assertNotIn("Administrator", call_kwargs["recipients"])
+		self.assertEqual(call_kwargs["args"]["instructors"][0].full_name, self.profile.full_name)
+		self.assertEqual(frappe.db.get_value("LMS Course", self.course.name, "notification_sent"), 1)
+
 	def _create_and_orphan_batch(self):
 		"""Create, attribute, then hard-delete a batch, leaving a dangling link behind.
 
