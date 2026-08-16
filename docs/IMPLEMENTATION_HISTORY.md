@@ -937,11 +937,26 @@ addresses. This fails for the built-in system account because its document name
 is `Administrator`, not an email address, and Google Calendar returns `Invalid
 attendee email` with HTTP 400. Biqat overrides the `LMS Live Class` document
 class and resolves every participant through the User record's `email` field.
-Syntactically invalid and duplicate addresses are excluded. Managed instructor
-profiles remain public course/batch attribution only and are not turned into
-Calendar attendees or login accounts.
+Syntactically invalid and duplicate addresses are excluded.
 
-### 18.2 Live class cards showed "Invalid Date" for sessions scheduled before 10am
+### 18.2 Managed instructors are invited to the live class by email, not by account
+
+Google Meet attendance is driven entirely by who is on the underlying Google
+Calendar event. Enrolled students and the internal batch manager get on that
+list because they are real Frappe Users; a managed instructor never is, since
+the whole point of a Biqat Instructor Profile is public attribution without a
+login. Left alone, the actual external teacher would never be invited to their
+own class, and staff would have to forward the join link by hand every time.
+
+`BiqatLMSLiveClass._get_managed_instructors()` looks up the profile(s)
+attributed to the batch and adds their private `contact_email` (the same field
+already excluded from every public API response) as a Calendar attendee. The
+`Event Participants` row references the `Biqat Instructor Profile` document
+directly rather than `User`, since no User exists to reference. This grants no
+login, no Course Instructor role, and no course/batch edit permission — only a
+Calendar invite.
+
+### 18.3 Live class cards showed "Invalid Date" for sessions scheduled before 10am
 
 Frappe returns `Time` fieldtype values as Python `timedelta` objects, whose
 default string form omits the leading zero on single-digit hours (`3:30:00`

@@ -318,6 +318,41 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		self.assertEqual(details.instructors[0].full_name, self.profile.full_name)
 		self.assertEqual(details.biqat_experts[0].profile_name, self.profile.name)
 
+	def test_managed_instructor_is_invited_to_live_class_without_a_login(self):
+		set_batch_instructor_profiles(self.batch.name, [self.profile.name])
+		frappe.get_doc(
+			{
+				"doctype": "LMS Batch Enrollment",
+				"batch": self.batch.name,
+				"member": self.student_email,
+			}
+		).insert(ignore_permissions=True)
+
+		event = frappe.get_doc(
+			{
+				"doctype": "Event",
+				"subject": "Test Live Class",
+				"event_type": "Public",
+				"starts_on": frappe.utils.now_datetime(),
+			}
+		).insert(ignore_permissions=True)
+
+		live_class = frappe.get_doc({"doctype": "LMS Live Class", "batch_name": self.batch.name})
+		live_class.add_event_participants(event, calendar=None)
+
+		participants = frappe.get_all(
+			"Event Participants",
+			filters={"parent": event.name},
+			fields=["email", "reference_doctype", "reference_docname"],
+		)
+		by_email = {row.email: row for row in participants}
+
+		self.assertIn(self.instructor_email, by_email)
+		self.assertEqual(by_email[self.instructor_email].reference_doctype, "Biqat Instructor Profile")
+		self.assertEqual(by_email[self.instructor_email].reference_docname, self.profile.name)
+		self.assertIn(self.student_email, by_email)
+		self.assertFalse(frappe.db.exists("User", {"email": self.instructor_email}))
+
 	def _create_and_orphan_batch(self):
 		"""Create, attribute, then hard-delete a batch, leaving a dangling link behind.
 
