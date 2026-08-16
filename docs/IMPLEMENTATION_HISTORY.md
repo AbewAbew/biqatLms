@@ -759,7 +759,9 @@ change.
 | `biqat_lms/page_renderers.py` | Injects the Biqat browser customization into the LMS shell |
 | `biqat_lms/public/js/lms_customizations.js` | Branding, UI removal, sidebar languages, instructor management and selectors |
 | `biqat_lms/setup/payment_defaults.py` | ETB, Chapa placeholder, payment defaults, GST enforcement |
+| `biqat_lms/setup/site_defaults.py` | Addis Ababa site timezone and Live Class timezone repair |
 | `biqat_lms/setup/programs.py` | Program Member repair and count synchronization |
+| `biqat_lms/overrides/lms_live_class.py` | Google Calendar attendee email normalization |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_profile/` | Public instructor profile DocType and tests |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_course/` | Instructor-to-course attribution child DocType |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_batch/` | Instructor-to-batch attribution child DocType |
@@ -792,7 +794,7 @@ in `apps/biqat_lms`, not as untracked production edits inside `apps/lms`.
 
 ## 17. Validation performed
 
-The custom app currently has 20 automated tests covering, among other things:
+The custom app currently has 27 automated tests covering, among other things:
 
 - required app versions;
 - Ethiopian payment defaults;
@@ -806,6 +808,10 @@ The custom app currently has 20 automated tests covering, among other things:
 - instructor management APIs;
 - Program enrollment parent field and member count;
 - migration repair of existing Program rows.
+- authoritative Batch timezone handling for Google Meet sessions;
+- Ethiopian site timezone configuration;
+- administrator Live Class deletion;
+- safe Google Calendar attendee email resolution.
 
 Standard validation commands:
 
@@ -881,17 +887,24 @@ successful local build or browser refresh.
 
 ### 18.1 Google Meet live classes inherit the Batch timezone
 
-The upstream Live Class modal can omit its `timezone` request value when its
-browser-generated canonical timezone list does not contain an IANA alias such
-as `Africa/Addis_Ababa`. The stock Google Meet endpoint then fails with
-`create_google_meet_live_class() missing 1 required positional argument:
-'timezone'`.
+The upstream Live Class modal can reject the valid browser alias
+`Africa/Addis_Ababa` because its hard-coded canonical timezone list contains
+the equivalent `Africa/Nairobi` instead. This caused either a missing-timezone
+request or an `unsupported timezone` console error after a successful save.
 
-Biqat overrides that endpoint through `override_whitelisted_methods`. When the
-modal sends no timezone, the wrapper uses the timezone already saved on the LMS
-Batch. An explicitly submitted timezone is still respected. This keeps Google
-Calendar and Meet scheduling aligned with the administrator's Batch settings
-and avoids making the administrator choose the same timezone twice.
+Biqat handles the frontend alias before the LMS bundle initializes and
+overrides the Google Meet endpoint through `override_whitelisted_methods`. The
+timezone saved on the LMS Batch is authoritative even if the browser submits
+the Nairobi equivalent. During installation and migration, System Settings is
+also set to `Africa/Addis_Ababa`, because Frappe's Google Calendar integration
+uses the site timezone rather than the timezone field on `LMS Live Class`.
+Existing Live Class timezone fields are repaired from their parent Batch.
+
+The stock LMS does not expose Live Class deletion in the batch interface.
+Biqat adds a system-administrator-only **Manage** dialog beside **Add**. It
+shows each session's saved timezone and deletes both the LMS Live Class and its
+linked Frappe Event; Frappe's Google Calendar deletion hook then removes the
+remote calendar event as well.
 
 The stock LMS also treats Frappe User document names as attendee email
 addresses. This fails for the built-in system account because its document name
@@ -977,6 +990,21 @@ The migration invokes the repair hook for existing enrollments.
 ### Certificate download returns `No wkhtmltopdf executable found`
 
 Install and validate the patched binary using section 14.
+
+### Live Class reports `unsupported timezone` or shows the wrong Google time
+
+Deploy the latest custom app and run `bench --site biqat.localhost migrate`.
+Confirm the regional defaults:
+
+```bash
+bench --site biqat.localhost execute frappe.db.get_single_value \
+  --args '["System Settings", "time_zone"]'
+```
+
+The result must be `Africa/Addis_Ababa`. The Batch timezone remains the source
+of truth for every new Live Class. Use the **Manage** button beside **Live
+Class → Add** to inspect the saved timezone or delete and recreate an event
+that was originally sent to Google before this correction.
 
 ## 20. Backups, security, and recovery
 

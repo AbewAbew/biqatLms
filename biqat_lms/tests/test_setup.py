@@ -14,6 +14,7 @@ from biqat_lms.setup.payment_defaults import (
 	ensure_ethiopian_birr,
 	set_default_currency_if_empty,
 )
+from biqat_lms.setup.site_defaults import ETHIOPIAN_TIMEZONE, configure_ethiopian_timezone
 
 
 class TestBiqatLMSSetup(FrappeTestCase):
@@ -55,6 +56,15 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		set_default_currency_if_empty()
 
 		self.assertEqual(frappe.db.get_single_value("LMS Settings", "default_currency"), "USD")
+
+	def test_site_timezone_is_ethiopian(self):
+		frappe.db.set_single_value("System Settings", "time_zone", "UTC")
+
+		configure_ethiopian_timezone()
+
+		self.assertEqual(
+			frappe.db.get_single_value("System Settings", "time_zone"), ETHIOPIAN_TIMEZONE
+		)
 
 	def test_chapa_placeholder_creates_gateway(self):
 		settings = frappe.get_single(CHAPA_SETTINGS_DOCTYPE)

@@ -465,12 +465,12 @@ def create_google_meet_live_class(
 	timezone: str | None = None,
 	description: str | None = None,
 ):
-	"""Create a Meet session, inheriting the Batch timezone when the UI omits it."""
+	"""Create a Meet session using the Batch's authoritative timezone."""
 	frappe.only_for(["Moderator", "Batch Evaluator"])
 	_validate_batch(batch_name)
-	effective_timezone = (timezone or "").strip() or frappe.db.get_value(
-		"LMS Batch", batch_name, "timezone"
-	)
+	effective_timezone = frappe.db.get_value("LMS Batch", batch_name, "timezone") or (
+		timezone or ""
+	).strip()
 	if not effective_timezone:
 		frappe.throw(_("Please set a timezone on this batch before creating a live class."))
 
@@ -484,6 +484,41 @@ def create_google_meet_live_class(
 		timezone=effective_timezone,
 		description=description,
 	)
+
+
+@frappe.whitelist()
+def list_batch_live_classes(batch: str):
+	"""Return scheduled sessions with their actual saved timezone for administration."""
+	_require_live_class_administrator()
+	_validate_batch(batch)
+	return frappe.get_all(
+		"LMS Live Class",
+		filters={"batch_name": batch},
+		fields=[
+			"name",
+			"title",
+			"date",
+			"time",
+			"duration",
+			"timezone",
+			"conferencing_provider",
+			"event",
+		],
+		order_by="date asc, time asc",
+	)
+
+
+@frappe.whitelist()
+def delete_live_class(live_class: str):
+	"""Delete a session and let LMS remove its linked Google Calendar event."""
+	_require_live_class_administrator()
+	if not isinstance(live_class, str) or not frappe.db.exists("LMS Live Class", live_class):
+		frappe.throw(_("Live class not found."), frappe.DoesNotExistError)
+
+	doc = frappe.get_doc("LMS Live Class", live_class)
+	result = {"name": doc.name, "title": doc.title}
+	doc.delete()
+	return result
 
 
 def ensure_internal_batch_manager(doc, method=None):
@@ -502,6 +537,12 @@ def _require_instructor_manager():
 		return
 	if not INSTRUCTOR_MANAGER_ROLES.intersection(frappe.get_roles()):
 		frappe.throw(_("You do not have permission to manage instructor profiles."), frappe.PermissionError)
+
+
+def _require_live_class_administrator():
+	if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+		return
+	frappe.throw(_("Only a system administrator can manage live classes."), frappe.PermissionError)
 
 
 def _require_course_manager(course: str):

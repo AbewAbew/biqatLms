@@ -118,6 +118,15 @@ profile pages, while Biqat retains editorial control.
 The operating procedure is documented in
 [`docs/MANAGED_INSTRUCTOR_WORKFLOW.md`](docs/MANAGED_INSTRUCTOR_WORKFLOW.md).
 
+## Live classes and Ethiopian time
+
+The timezone saved on an LMS Batch is authoritative for its Google Meet live
+classes. Installation and migration set Frappe's site timezone to
+`Africa/Addis_Ababa`, repair existing Live Class timezone fields from their
+Batch, and handle the browser's equivalent `Africa/Nairobi` canonical name.
+System administrators can use **Batch → Live Class → Manage** to inspect the
+saved timezone or delete a session and its linked Google Calendar event.
+
 ## Onboarding and help
 
 Frappe Learning's stock **Getting started** popup and its link to the upstream

@@ -11,6 +11,8 @@ const SIDEBAR_SOURCE_LABEL_ATTRIBUTE = "data-biqat-sidebar-source-label";
 const INSTRUCTOR_MANAGER_ID = "biqat-instructor-manager";
 const USERS_INSTRUCTOR_SECTION_ID = "biqat-users-instructor-profiles";
 const COURSE_PUBLIC_INSTRUCTOR_CLASS = "biqat-course-public-instructors";
+const LIVE_CLASS_MANAGER_ID = "biqat-live-class-manager";
+const LIVE_CLASS_MANAGER_BUTTON_ID = "biqat-live-class-manager-button";
 const API_BASE = "/api/method/biqat_lms.api";
 const SIDEBAR_TRANSLATIONS = Object.freeze({
 	Home: "መነሻ",
@@ -35,6 +37,28 @@ let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
 let pendingCourseProfiles = [];
 let pendingBatchProfiles = [];
+
+function installEthiopianTimezoneCompatibility() {
+	const prototype = Intl.DateTimeFormat?.prototype;
+	const originalResolvedOptions = prototype?.resolvedOptions;
+	if (!originalResolvedOptions || originalResolvedOptions.biqatTimezoneCompatibility) return;
+
+	function resolvedOptionsWithCanonicalTimezone(...args) {
+		const options = originalResolvedOptions.apply(this, args);
+		if (options.timeZone !== "Africa/Addis_Ababa") return options;
+		return { ...options, timeZone: "Africa/Nairobi" };
+	}
+	resolvedOptionsWithCanonicalTimezone.biqatTimezoneCompatibility = true;
+	Object.defineProperty(prototype, "resolvedOptions", {
+		configurable: true,
+		writable: true,
+		value: resolvedOptionsWithCanonicalTimezone,
+	});
+}
+
+// Frappe Learning's hard-coded list contains Africa/Nairobi (the canonical
+// equivalent) but rejects the browser alias Africa/Addis_Ababa.
+installEthiopianTimezoneCompatibility();
 
 function disableFrappeOnboarding() {
 	const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
@@ -155,6 +179,17 @@ function installUiStyles() {
 		.biqat-button-solid:active:not(:disabled) {
 			border-color: var(--surface-gray-8, #404040);
 			background: var(--surface-gray-8, #404040);
+		}
+
+		.biqat-button-danger {
+			border-color: var(--outline-red-2, #fecaca);
+			background: var(--surface-red-1, #fef2f2);
+			color: var(--ink-red-6, #dc2626);
+		}
+
+		.biqat-button-danger:hover:not(:disabled) {
+			border-color: var(--outline-red-3, #fca5a5);
+			background: var(--surface-red-2, #fee2e2);
 		}
 
 		#${USERS_INSTRUCTOR_SECTION_ID} {
@@ -302,6 +337,10 @@ function installUiStyles() {
 		.biqat-picker-footer button { display: inline-flex; min-height: 1.75rem; align-items: center; gap: 0.375rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; color: var(--ink-gray-7, #374151); font-size: 0.8125rem; }
 		.biqat-picker-footer button:hover { background: var(--surface-gray-2, #f3f4f6); }
 		.biqat-muted { color: var(--ink-gray-5, #6b7280); font-size: 0.8125rem; }
+		.biqat-live-class-row { display: flex; align-items: center; gap: 1rem; padding: 0.875rem 0; border-top: 1px solid var(--outline-gray-1, #e5e7eb); }
+		.biqat-live-class-row:first-child { border-top: 0; }
+		.biqat-live-class-details { min-width: 0; flex: 1; }
+		.biqat-live-class-details strong { display: block; color: var(--ink-gray-9, #111827); }
 
 		@media (max-width: 640px) { .biqat-form-grid { grid-template-columns: 1fr; } }
 	`;
@@ -959,6 +998,149 @@ function currentBatchName() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
+function closeLiveClassManager() {
+	document.getElementById(LIVE_CLASS_MANAGER_ID)?.remove();
+}
+
+function createLiveClassManagerShell() {
+	closeLiveClassManager();
+	const backdrop = document.createElement("div");
+	backdrop.id = LIVE_CLASS_MANAGER_ID;
+	backdrop.className = "biqat-modal-backdrop";
+	backdrop.innerHTML = `
+		<section class="biqat-modal" role="dialog" aria-modal="true" aria-labelledby="biqat-live-class-title">
+			<header class="biqat-modal-header">
+				<div><h2 id="biqat-live-class-title" class="text-xl font-semibold">Manage live classes</h2><p class="biqat-muted">Times are shown in the timezone saved on each class.</p></div>
+				<button type="button" class="biqat-button" data-action="close" aria-label="Close">×</button>
+			</header>
+			<div class="biqat-modal-body">Loading live classes…</div>
+		</section>`;
+	backdrop
+		.querySelector('[data-action="close"]')
+		.addEventListener("click", closeLiveClassManager);
+	backdrop.addEventListener("click", (event) => {
+		if (event.target === backdrop) closeLiveClassManager();
+	});
+	document.body.appendChild(backdrop);
+	return backdrop;
+}
+
+function formatClockTime(value, duration = 0) {
+	const [rawHours = "0", rawMinutes = "0"] = String(value || "").split(":");
+	const totalMinutes = Number(rawHours) * 60 + Number(rawMinutes) + Number(duration || 0);
+	const hours = Math.floor((totalMinutes % 1440) / 60);
+	const minutes = totalMinutes % 60;
+	const suffix = hours >= 12 ? "PM" : "AM";
+	return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+function formatLiveClassDate(value) {
+	if (!value) return "Date not set";
+	const date = new Date(`${value}T00:00:00Z`);
+	if (Number.isNaN(date.getTime())) return value;
+	return new Intl.DateTimeFormat(undefined, {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+		timeZone: "UTC",
+	}).format(date);
+}
+
+async function renderLiveClassManager(shell) {
+	const body = shell.querySelector(".biqat-modal-body");
+	const batch = currentBatchName();
+	if (!batch) {
+		body.textContent = "Batch not found.";
+		return;
+	}
+
+	try {
+		const classes = (await apiCall("list_batch_live_classes", { batch })) || [];
+		body.replaceChildren();
+		if (!classes.length) {
+			body.append(createTextElement("p", "No live classes scheduled.", "biqat-muted"));
+			return;
+		}
+
+		for (const liveClass of classes) {
+			const row = document.createElement("div");
+			row.className = "biqat-live-class-row";
+			const details = document.createElement("div");
+			details.className = "biqat-live-class-details";
+			details.append(
+				createTextElement("strong", liveClass.title || "Live class"),
+				createTextElement(
+					"span",
+					`${formatLiveClassDate(liveClass.date)} · ${formatClockTime(
+						liveClass.time
+					)}–${formatClockTime(liveClass.time, liveClass.duration)} · ${
+						liveClass.timezone || "Timezone not set"
+					}`,
+					"biqat-muted"
+				)
+			);
+			const remove = createTextElement(
+				"button",
+				"Delete",
+				"biqat-button biqat-button-danger"
+			);
+			remove.type = "button";
+			remove.addEventListener("click", async () => {
+				if (!window.confirm(`Delete “${liveClass.title}” and its linked calendar event?`))
+					return;
+				remove.disabled = true;
+				remove.textContent = "Deleting…";
+				try {
+					await apiCall("delete_live_class", { live_class: liveClass.name });
+					window.location.reload();
+				} catch (error) {
+					alert(error.message);
+					remove.disabled = false;
+					remove.textContent = "Delete";
+				}
+			});
+			row.append(details, remove);
+			body.append(row);
+		}
+	} catch (error) {
+		body.textContent = error.message;
+	}
+}
+
+function openLiveClassManager() {
+	const shell = createLiveClassManagerShell();
+	renderLiveClassManager(shell);
+}
+
+function isAdministratorSession() {
+	const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
+	return cookies.get("user_id") === "Administrator";
+}
+
+function ensureLiveClassManagerButton() {
+	if (!currentBatchName() || !isAdministratorSession()) return;
+	const existing = document.getElementById(LIVE_CLASS_MANAGER_BUTTON_ID);
+	if (existing) return;
+
+	for (const heading of document.querySelectorAll("div")) {
+		if (heading.textContent.trim() !== "Live Class" || heading.children.length) continue;
+		const header = heading.parentElement;
+		const addButton = Array.from(header?.children || []).find(
+			(element) => element.tagName === "BUTTON" && element.textContent.trim() === "Add"
+		);
+		if (!header || !addButton) continue;
+
+		const manage = createTextElement("button", "Manage", "biqat-button");
+		manage.id = LIVE_CLASS_MANAGER_BUTTON_ID;
+		manage.type = "button";
+		manage.style.marginLeft = "auto";
+		manage.addEventListener("click", openLiveClassManager);
+		header.style.gap = "0.5rem";
+		header.insertBefore(manage, addButton);
+		return;
+	}
+}
+
 function getLabelText(label) {
 	return (label.textContent || "")
 		.replace(/\s*\*\s*(?:\(required\))?\s*$/i, "")
@@ -1244,6 +1426,7 @@ const observer = new MutationObserver(() => {
 		repairBrandingImages();
 		ensureUsersInstructorSection();
 		ensureCourseInstructorPickers();
+		ensureLiveClassManagerButton();
 		updateScheduled = false;
 	});
 });
@@ -1258,6 +1441,7 @@ function initializeDomCustomizations() {
 	repairBrandingImages();
 	ensureUsersInstructorSection();
 	ensureCourseInstructorPickers();
+	ensureLiveClassManagerButton();
 	observer.observe(document.body, { childList: true, subtree: true });
 	headObserver.observe(document.head, {
 		attributes: true,

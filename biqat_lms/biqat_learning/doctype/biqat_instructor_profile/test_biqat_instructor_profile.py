@@ -7,6 +7,7 @@ from lms.lms.utils import can_modify_course
 
 from biqat_lms.api import (
 	create_google_meet_live_class,
+	delete_live_class,
 	enroll_in_program,
 	get_batch_details,
 	get_batch_experts_map,
@@ -168,7 +169,7 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		self.assertEqual(create_live_class.call_args.kwargs["timezone"], "Africa/Addis_Ababa")
 
 	@patch("biqat_lms.api.lms_create_google_meet_live_class")
-	def test_google_meet_live_class_respects_explicit_timezone(self, create_live_class):
+	def test_google_meet_live_class_keeps_batch_timezone(self, create_live_class):
 		create_live_class.return_value = frappe._dict({"name": "LIVE-CLASS-TEST"})
 
 		create_google_meet_live_class(
@@ -181,7 +182,19 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 			timezone="Africa/Nairobi",
 		)
 
-		self.assertEqual(create_live_class.call_args.kwargs["timezone"], "Africa/Nairobi")
+		self.assertEqual(create_live_class.call_args.kwargs["timezone"], "Africa/Addis_Ababa")
+
+	@patch("biqat_lms.api.frappe.get_doc")
+	@patch("biqat_lms.api.frappe.db.exists", return_value=True)
+	def test_system_administrator_can_delete_live_class(self, exists, get_doc):
+		live_class = get_doc.return_value
+		live_class.name = "LIVE-CLASS-TEST"
+		live_class.title = "Ethiopian Arbitration Live Session"
+
+		result = delete_live_class(live_class.name)
+
+		self.assertEqual(result["name"], live_class.name)
+		live_class.delete.assert_called_once_with()
 
 	def test_student_program_course_card_uses_public_instructor(self):
 		stock_course = frappe._dict(

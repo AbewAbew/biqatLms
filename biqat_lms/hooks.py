@@ -86,11 +86,11 @@ website_redirects = [{"source": "/me", "target": "/lms"}]
 # ------------
 
 # before_install = "biqat_lms.install.before_install"
-after_install = "biqat_lms.setup.payment_defaults.configure_ethiopian_payments"
+after_install = "biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults"
 
 # Keep site-level defaults and derived Program counts correct after migrations.
 after_migrate = [
-	"biqat_lms.setup.payment_defaults.configure_ethiopian_payments",
+	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
 	"biqat_lms.setup.programs.sync_program_member_counts",
 ]
 
