@@ -6,6 +6,7 @@ from frappe.utils import add_days, nowdate
 from lms.lms.utils import can_modify_course
 
 from biqat_lms.api import (
+	create_google_meet_live_class,
 	enroll_in_program,
 	get_batch_details,
 	get_batch_experts_map,
@@ -149,6 +150,38 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 
 		self.assertEqual(courses[0].instructors[0].full_name, self.profile.full_name)
 		self.assertEqual(courses[0].membership.progress, 25)
+
+	@patch("biqat_lms.api.lms_create_google_meet_live_class")
+	def test_google_meet_live_class_inherits_batch_timezone(self, create_live_class):
+		create_live_class.return_value = frappe._dict({"name": "LIVE-CLASS-TEST"})
+
+		result = create_google_meet_live_class(
+			batch_name=self.batch.name,
+			google_meet_account="Biqat Google Meet",
+			title="Ethiopian Arbitration Live Session",
+			duration=60,
+			date=add_days(nowdate(), 1),
+			time="10:00:00",
+		)
+
+		self.assertEqual(result.name, "LIVE-CLASS-TEST")
+		self.assertEqual(create_live_class.call_args.kwargs["timezone"], "Africa/Addis_Ababa")
+
+	@patch("biqat_lms.api.lms_create_google_meet_live_class")
+	def test_google_meet_live_class_respects_explicit_timezone(self, create_live_class):
+		create_live_class.return_value = frappe._dict({"name": "LIVE-CLASS-TEST"})
+
+		create_google_meet_live_class(
+			batch_name=self.batch.name,
+			google_meet_account="Biqat Google Meet",
+			title="Ethiopian Arbitration Live Session",
+			duration=60,
+			date=add_days(nowdate(), 1),
+			time="10:00:00",
+			timezone="Africa/Nairobi",
+		)
+
+		self.assertEqual(create_live_class.call_args.kwargs["timezone"], "Africa/Nairobi")
 
 	def test_student_program_course_card_uses_public_instructor(self):
 		stock_course = frappe._dict(

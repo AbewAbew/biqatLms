@@ -240,12 +240,19 @@ Verify the deployment:
 
 ```bash
 bench --site biqat.localhost list-apps
+git -C apps/biqat_lms log -1 --oneline
+grep CUSTOMIZATION_SCRIPT apps/biqat_lms/biqat_lms/page_renderers.py
 sudo supervisorctl status
 curl -I -H "Host: biqat.localhost" http://127.0.0.1/lms
+curl -s https://biqat.lexprime.et/lms/batches \
+  | grep -o 'lms_customizations.js?v=[0-9]*'
 ```
 
 All Supervisor processes should report `RUNNING`, and the HTTP request should
-return a successful response.
+return a successful response. The live script version must match the version in
+`page_renderers.py`; this catches a pull from the wrong remote or a stale cloud
+checkout even when the local build and services themselves succeed. The cloud
+clone uses `upstream`, while the local development checkout uses `origin`.
 
 If `git pull --ff-only` refuses to update, stop and inspect `git status` and
 the commit history. Do not force-reset production or overwrite uncommitted

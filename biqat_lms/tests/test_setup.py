@@ -98,3 +98,11 @@ class TestBiqatLMSSetup(FrappeTestCase):
 
 	def test_default_website_profile_redirects_to_lms(self):
 		self.assertIn({"source": "/me", "target": "/lms"}, biqat_hooks.website_redirects)
+
+	def test_google_meet_live_class_uses_biqat_timezone_wrapper(self):
+		self.assertEqual(
+			biqat_hooks.override_whitelisted_methods[
+				"lms.lms.doctype.lms_batch.lms_batch.create_google_meet_live_class"
+			],
+			"biqat_lms.api.create_google_meet_live_class",
+		)

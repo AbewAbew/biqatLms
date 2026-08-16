@@ -10,6 +10,9 @@ from lms.lms.api import get_created_courses as lms_get_created_courses
 from lms.lms.api import get_my_batches as lms_get_my_batches
 from lms.lms.api import get_my_courses as lms_get_my_courses
 from lms.lms.api import get_profile_details as lms_get_profile_details
+from lms.lms.doctype.lms_batch.lms_batch import (
+	create_google_meet_live_class as lms_create_google_meet_live_class,
+)
 from lms.lms.utils import (
 	can_modify_batch,
 	can_modify_course,
@@ -449,6 +452,38 @@ def set_batch_instructor_profiles(batch: str, profiles: str | list[str] | None =
 		doc.save()
 
 	return get_batch_experts_map([batch]).get(batch, [])
+
+
+@frappe.whitelist()
+def create_google_meet_live_class(
+	batch_name: str,
+	google_meet_account: str,
+	title: str,
+	duration: int,
+	date: str,
+	time: str,
+	timezone: str | None = None,
+	description: str | None = None,
+):
+	"""Create a Meet session, inheriting the Batch timezone when the UI omits it."""
+	frappe.only_for(["Moderator", "Batch Evaluator"])
+	_validate_batch(batch_name)
+	effective_timezone = (timezone or "").strip() or frappe.db.get_value(
+		"LMS Batch", batch_name, "timezone"
+	)
+	if not effective_timezone:
+		frappe.throw(_("Please set a timezone on this batch before creating a live class."))
+
+	return lms_create_google_meet_live_class(
+		batch_name=batch_name,
+		google_meet_account=google_meet_account,
+		title=title,
+		duration=duration,
+		date=date,
+		time=time,
+		timezone=effective_timezone,
+		description=description,
+	)
 
 
 def ensure_internal_batch_manager(doc, method=None):

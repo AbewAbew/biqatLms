@@ -861,11 +861,37 @@ Verify production:
 
 ```bash
 bench --site biqat.localhost list-apps
+git -C apps/biqat_lms log -1 --oneline
+grep CUSTOMIZATION_SCRIPT apps/biqat_lms/biqat_lms/page_renderers.py
 sudo supervisorctl status
 sudo nginx -t
 curl -I -H "Host: biqat.lexprime.et" http://127.0.0.1/lms
 curl -I https://biqat.lexprime.et/lms
+curl -s https://biqat.lexprime.et/lms/batches \
+  | grep -o 'lms_customizations.js?v=[0-9]*'
 ```
+
+The production custom-app checkout uses the Git remote name `upstream`, not
+`origin`. A deployment in August 2026 appeared to complete while production
+continued serving customization script `v19`; the corrected code was `v23`.
+The live HTML version check above is therefore mandatory after frontend
+deployments. It confirms both that the intended commit was pulled and that the
+running Frappe site is rendering the updated custom app. Do not rely only on a
+successful local build or browser refresh.
+
+### 18.1 Google Meet live classes inherit the Batch timezone
+
+The upstream Live Class modal can omit its `timezone` request value when its
+browser-generated canonical timezone list does not contain an IANA alias such
+as `Africa/Addis_Ababa`. The stock Google Meet endpoint then fails with
+`create_google_meet_live_class() missing 1 required positional argument:
+'timezone'`.
+
+Biqat overrides that endpoint through `override_whitelisted_methods`. When the
+modal sends no timezone, the wrapper uses the timezone already saved on the LMS
+Batch. An explicitly submitted timezone is still respected. This keeps Google
+Calendar and Meet scheduling aligned with the administrator's Batch settings
+and avoids making the administrator choose the same timezone twice.
 
 Use a hard refresh (`Ctrl+Shift+R`) after frontend changes. If a PWA service
 worker still serves an old bundle, clear the site's browser storage and reload.
