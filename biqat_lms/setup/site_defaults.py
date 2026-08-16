@@ -10,6 +10,7 @@ def configure_ethiopian_site_defaults():
 	configure_ethiopian_payments()
 	configure_ethiopian_timezone()
 	repair_live_class_timezones()
+	disable_course_publish_broadcast()
 
 
 def configure_ethiopian_timezone():
@@ -28,3 +29,19 @@ def repair_live_class_timezones():
 			AND COALESCE(live_class.timezone, '') != batch.timezone
 		"""
 	)
+
+
+def disable_course_publish_broadcast():
+	"""Keep the stock "course published" broadcast off.
+
+	lms.lms.doctype.lms_course.lms_course.send_notification_for_published_courses
+	runs daily via the scheduler whenever LMS Settings.send_notification_for_published_courses
+	is set, and it credits the internal editor (e.g. "Administrator") by name in a
+	message sent to every enabled user, not the managed instructor. That function
+	is not whitelisted, so it cannot be intercepted the way course/batch/certificate
+	data is elsewhere in this app. Force the toggle back off on every migrate so an
+	admin exploring LMS Settings can't switch it on without also reintroducing the
+	leak; this is enforced here rather than left as a one-time manual setting.
+	"""
+	if frappe.db.get_single_value("LMS Settings", "send_notification_for_published_courses"):
+		frappe.db.set_single_value("LMS Settings", "send_notification_for_published_courses", "")

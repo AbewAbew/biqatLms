@@ -687,6 +687,21 @@ Frappe returns thrown messages in `_server_messages`, not in the `message` or
 `_error_message` fields the helper checked. It now parses `_server_messages`
 so future validation failures show their real reason in the alert.
 
+### 12.6 The stock course-publish broadcast is forced off
+
+`lms.lms.doctype.lms_course.lms_course.send_notification_for_published_courses`
+runs daily via the LMS scheduler whenever `LMS Settings.send_notification_for_published_courses`
+is set, and credits the internal editor (e.g. `Administrator`) by name in a
+message broadcast to every enabled user — not the managed instructor. That
+function is a plain scheduled job, not a whitelisted API method, so it cannot
+be intercepted with `override_whitelisted_methods` the way course, batch, and
+certificate data are elsewhere in this app.
+
+`biqat_lms.setup.site_defaults.disable_course_publish_broadcast()` forces the
+setting back off on every `after_install`/`after_migrate`, so an administrator
+exploring LMS Settings can turn it on but the next deployment turns it back
+off before it can leak the internal editor's identity.
+
 ## 13. Programs and learner enrollment
 
 Programs and Batches are different concepts:
