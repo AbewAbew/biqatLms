@@ -959,20 +959,11 @@ function currentBatchName() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-function setLabelText(label, value) {
-	for (const node of label.childNodes) {
-		if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-			node.textContent = value;
-			return;
-		}
-	}
-}
-
 function getLabelText(label) {
-	const textNode = Array.from(label.childNodes).find(
-		(node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim()
-	);
-	return textNode?.textContent.trim() || "";
+	return (label.textContent || "")
+		.replace(/\s*\*\s*(?:\(required\))?\s*$/i, "")
+		.replace(/\s+/g, " ")
+		.trim();
 }
 
 function refreshCourseInstructorPickers() {
@@ -996,10 +987,6 @@ async function ensureCourseInstructorPickers() {
 		if (!["Instructors", "Course editors", "Batch managers"].includes(labelText)) continue;
 		const editorField = label.parentElement;
 		if (!editorField || editorField.dataset.biqatInstructorField === "1") continue;
-		editorField.dataset.biqatInstructorField = "1";
-		setLabelText(label, resourceType === "batch" ? "Batch managers" : "Course editors");
-
-		if (!resourceName && !label.closest('[role="dialog"]')) continue;
 		const picker = document.createElement("div");
 		picker.className = `space-y-1.5 ${COURSE_PUBLIC_INSTRUCTOR_CLASS}`;
 		const instructorLabel = createTextElement(
@@ -1014,6 +1001,7 @@ async function ensureCourseInstructorPickers() {
 			instructorLabel,
 			createTextElement("p", "Loading instructor profiles…", "biqat-muted")
 		);
+		editorField.dataset.biqatInstructorField = "1";
 		editorField.insertAdjacentElement("afterend", picker);
 		editorField.hidden = true;
 		try {
