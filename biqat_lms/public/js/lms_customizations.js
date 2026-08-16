@@ -34,6 +34,7 @@ let sidebarLanguage = getStoredSidebarLanguage();
 let brandingLogoUrl = null;
 let brandingFaviconUrl = null;
 let pendingCourseProfiles = [];
+let pendingBatchProfiles = [];
 
 function disableFrappeOnboarding() {
 	const cookies = new URLSearchParams(document.cookie.split("; ").join("&"));
@@ -116,22 +117,58 @@ function installUiStyles() {
 			padding: 0.25rem 0.625rem;
 			border: 1px solid var(--outline-gray-2, #d1d5db);
 			border-radius: 0.5rem;
-			background: var(--surface-base, #fff);
+			background: var(--surface-base, #ffffff);
 			color: var(--ink-gray-8, #1f2937);
 			font-size: 0.875rem;
 			font-weight: 500;
+			line-height: 1.25rem;
+			transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 		}
 
-		.biqat-button:hover { background: var(--surface-gray-2, #f3f4f6); }
-		.biqat-button-solid { background: var(--ink-gray-9, #111827); color: #fff; border-color: transparent; }
-		.biqat-button-solid:hover { background: var(--ink-gray-8, #1f2937); }
+		.biqat-button:hover:not(:disabled) {
+			border-color: var(--outline-gray-3, #9ca3af);
+			background: var(--surface-gray-2, #f3f4f6);
+		}
+
+		.biqat-button:active:not(:disabled) {
+			background: var(--surface-gray-4, #d1d5db);
+		}
+
+		.biqat-button:disabled {
+			cursor: not-allowed;
+			border-color: var(--outline-gray-2, #d1d5db);
+			background: var(--surface-gray-2, #f3f4f6);
+			color: var(--ink-gray-4, #9ca3af);
+		}
+
+		.biqat-button-solid {
+			border-color: var(--surface-gray-10, #171717);
+			background: var(--surface-gray-10, #171717);
+			color: var(--ink-base, #ffffff);
+		}
+
+		.biqat-button-solid:hover:not(:disabled) {
+			border-color: var(--surface-gray-9, #262626);
+			background: var(--surface-gray-9, #262626);
+		}
+
+		.biqat-button-solid:active:not(:disabled) {
+			border-color: var(--surface-gray-8, #404040);
+			background: var(--surface-gray-8, #404040);
+		}
 
 		#${USERS_INSTRUCTOR_SECTION_ID} {
 			margin-bottom: 1rem;
 			padding: 1rem;
 			border: 1px solid var(--outline-gray-2, #e5e7eb);
 			border-radius: 0.75rem;
-			background: var(--surface-base, #fff);
+			background: var(--surface-base, #ffffff);
+			color: var(--ink-gray-9, #111827);
+		}
+
+		#${USERS_INSTRUCTOR_SECTION_ID} h3,
+		.biqat-modal h2 {
+			color: var(--ink-gray-9, #111827);
 		}
 
 		.biqat-profile-row {
@@ -139,7 +176,13 @@ function installUiStyles() {
 			align-items: center;
 			gap: 0.75rem;
 			padding: 0.625rem 0;
+			border-right: 0;
+			border-bottom: 0;
+			border-left: 0;
 			border-top: 1px solid var(--outline-gray-1, #f3f4f6);
+			background: transparent;
+			color: var(--ink-gray-9, #111827);
+			font: inherit;
 		}
 
 		.biqat-profile-avatar {
@@ -166,7 +209,8 @@ function installUiStyles() {
 			max-height: min(50rem, calc(100vh - 2rem));
 			overflow: auto;
 			border-radius: 0.875rem;
-			background: var(--surface-base, #fff);
+			border: 1px solid var(--outline-gray-2, #d1d5db);
+			background: var(--surface-base, #ffffff);
 			box-shadow: 0 20px 60px rgb(0 0 0 / 0.24);
 			color: var(--ink-gray-9, #111827);
 		}
@@ -192,7 +236,18 @@ function installUiStyles() {
 			border: 1px solid var(--outline-gray-2, #d1d5db);
 			border-radius: 0.5rem;
 			background: var(--surface-gray-2, #f9fafb);
-			color: inherit;
+			color: var(--ink-gray-9, #111827);
+		}
+
+		.biqat-form-field input::placeholder,
+		.biqat-form-field textarea::placeholder {
+			color: var(--ink-gray-4, #9ca3af);
+		}
+
+		.biqat-form-field input:focus,
+		.biqat-form-field textarea:focus {
+			border-color: var(--outline-gray-4, #6b7280);
+			outline: none;
 		}
 
 		.biqat-course-public-instructors { position: relative; }
@@ -306,7 +361,7 @@ window.fetch = (resource, options) => {
 	if (getRequestPath(resource) === BRANDING_ENDPOINT) {
 		response.then(captureBrandingResponse).catch(() => {});
 	}
-	return captureNewCourseProfiles(resource, options, response);
+	return captureNewInstructorProfiles(resource, options, response);
 };
 
 async function apiCall(method, args = {}) {
@@ -332,13 +387,8 @@ async function apiCall(method, args = {}) {
 	return payload.message;
 }
 
-async function captureNewCourseProfiles(resource, options, responsePromise) {
-	if (
-		getRequestPath(resource) !== "/api/method/frappe.client.insert" ||
-		!pendingCourseProfiles.length
-	) {
-		return responsePromise;
-	}
+async function captureNewInstructorProfiles(resource, options, responsePromise) {
+	if (getRequestPath(resource) !== "/api/method/frappe.client.insert") return responsePromise;
 
 	let body;
 	try {
@@ -347,7 +397,12 @@ async function captureNewCourseProfiles(resource, options, responsePromise) {
 	} catch {
 		return responsePromise;
 	}
-	if (body?.doc?.doctype !== "LMS Course") return responsePromise;
+	const doctype = body?.doc?.doctype;
+	const isCourse = doctype === "LMS Course";
+	const isBatch = doctype === "LMS Batch";
+	if (!isCourse && !isBatch) return responsePromise;
+	const pendingProfiles = isCourse ? pendingCourseProfiles : pendingBatchProfiles;
+	if (!pendingProfiles.length) return responsePromise;
 
 	const response = await responsePromise;
 	if (!response.ok) return response;
@@ -355,13 +410,20 @@ async function captureNewCourseProfiles(resource, options, responsePromise) {
 		.clone()
 		.json()
 		.catch(() => null);
-	const course = payload?.message?.name || payload?.docs?.[0]?.name;
-	if (!course) return response;
+	const documentName = payload?.message?.name || payload?.docs?.[0]?.name;
+	if (!documentName) return response;
 
-	const selected = [...pendingCourseProfiles];
+	const selected = [...pendingProfiles];
 	try {
-		await apiCall("set_course_instructor_profiles", { course, profiles: selected });
-		pendingCourseProfiles = [];
+		await apiCall(
+			isCourse ? "set_course_instructor_profiles" : "set_batch_instructor_profiles",
+			{
+				[isCourse ? "course" : "batch"]: documentName,
+				profiles: selected,
+			}
+		);
+		if (isCourse) pendingCourseProfiles = [];
+		else pendingBatchProfiles = [];
 	} catch (error) {
 		console.error("Unable to save public instructors", error);
 	}
@@ -892,6 +954,11 @@ function currentCourseName() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
+function currentBatchName() {
+	const match = window.location.pathname.match(/^\/lms\/batches\/([^/]+)/);
+	return match ? decodeURIComponent(match[1]) : null;
+}
+
 function setLabelText(label, value) {
 	for (const node of label.childNodes) {
 		if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
@@ -918,21 +985,21 @@ function refreshCourseInstructorPickers() {
 }
 
 async function ensureCourseInstructorPickers() {
-	// The LMS reuses the label "Instructors" for both courses and batches.
-	// Public instructor profiles replace course attribution only; batch instructors
-	// are real User rows that grant permission to manage and host the batch.
-	if (!/^\/lms\/courses(?:\/|$)/.test(window.location.pathname)) return;
+	const isCoursePage = /^\/lms\/courses(?:\/|$)/.test(window.location.pathname);
+	const isBatchPage = /^\/lms\/batches(?:\/|$)/.test(window.location.pathname);
+	if (!isCoursePage && !isBatchPage) return;
+	const resourceType = isBatchPage ? "batch" : "course";
+	const resourceName = isBatchPage ? currentBatchName() : currentCourseName();
 
 	for (const label of document.querySelectorAll("label")) {
 		const labelText = getLabelText(label);
-		if (!["Instructors", "Course editors"].includes(labelText)) continue;
+		if (!["Instructors", "Course editors", "Batch managers"].includes(labelText)) continue;
 		const editorField = label.parentElement;
 		if (!editorField || editorField.dataset.biqatInstructorField === "1") continue;
 		editorField.dataset.biqatInstructorField = "1";
-		setLabelText(label, "Course editors");
+		setLabelText(label, resourceType === "batch" ? "Batch managers" : "Course editors");
 
-		const course = currentCourseName();
-		if (!course && !label.closest('[role="dialog"]')) continue;
+		if (!resourceName && !label.closest('[role="dialog"]')) continue;
 		const picker = document.createElement("div");
 		picker.className = `space-y-1.5 ${COURSE_PUBLIC_INSTRUCTOR_CLASS}`;
 		const instructorLabel = createTextElement(
@@ -950,19 +1017,31 @@ async function ensureCourseInstructorPickers() {
 		editorField.insertAdjacentElement("afterend", picker);
 		editorField.hidden = true;
 		try {
-			const profiles = await apiCall("list_instructor_profiles", course ? { course } : {});
-			if (picker.isConnected) renderCourseInstructorPicker(picker, profiles || [], course);
+			const args = resourceName ? { [resourceType]: resourceName } : {};
+			const profiles = await apiCall("list_instructor_profiles", args);
+			if (picker.isConnected)
+				renderManagedInstructorPicker(picker, profiles || [], resourceType, resourceName);
 		} catch (error) {
 			picker.querySelector("p").textContent = error.message;
 		}
 	}
 }
 
-function renderCourseInstructorPicker(picker, profiles, course) {
+function renderManagedInstructorPicker(picker, profiles, resourceType, resourceName) {
+	const pendingProfiles =
+		resourceType === "batch" ? pendingBatchProfiles : pendingCourseProfiles;
 	const selected = new Set(
-		profiles.filter((profile) => profile.selected).map((profile) => profile.name)
+		profiles
+			.filter(
+				(profile) =>
+					profile.selected || (!resourceName && pendingProfiles.includes(profile.name))
+			)
+			.map((profile) => profile.name)
 	);
-	if (!course) pendingCourseProfiles = [];
+	if (!resourceName && !pendingProfiles.length) {
+		if (resourceType === "batch") pendingBatchProfiles = [];
+		else pendingCourseProfiles = [];
+	}
 	const description = picker.querySelector("p");
 
 	if (!profiles.some((profile) => profile.enabled)) {
@@ -1013,15 +1092,21 @@ function renderCourseInstructorPicker(picker, profiles, course) {
 	const optionInputs = new Map();
 
 	const persistSelection = async () => {
-		if (!course) {
-			pendingCourseProfiles = [...selected];
+		if (!resourceName) {
+			if (resourceType === "batch") pendingBatchProfiles = [...selected];
+			else pendingCourseProfiles = [...selected];
 			return;
 		}
 		try {
-			await apiCall("set_course_instructor_profiles", {
-				course,
-				profiles: [...selected],
-			});
+			await apiCall(
+				resourceType === "batch"
+					? "set_batch_instructor_profiles"
+					: "set_course_instructor_profiles",
+				{
+					[resourceType]: resourceName,
+					profiles: [...selected],
+				}
+			);
 		} catch (error) {
 			alert(error.message);
 		}
@@ -1059,7 +1144,10 @@ function renderCourseInstructorPicker(picker, profiles, course) {
 			entry.checkbox.checked = selected.has(profileName);
 			entry.option.dataset.selected = selected.has(profileName) ? "true" : "false";
 		}
-		if (!course) pendingCourseProfiles = [...selected];
+		if (!resourceName) {
+			if (resourceType === "batch") pendingBatchProfiles = [...selected];
+			else pendingCourseProfiles = [...selected];
+		}
 	};
 
 	for (const profile of profiles.filter((item) => item.enabled)) {

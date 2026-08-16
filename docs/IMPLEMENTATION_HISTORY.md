@@ -643,20 +643,19 @@ directly, bypassing the initial course API override.
 The detailed editorial workflow is in
 [`MANAGED_INSTRUCTOR_WORKFLOW.md`](MANAGED_INSTRUCTOR_WORKFLOW.md).
 
-### 12.4 Batch managers are not public instructor profiles
+### 12.4 Public batch teachers and internal batch managers
 
-An LMS Batch instructor is a real Frappe User stored in the required
+An upstream LMS Batch instructor is a real Frappe User stored in the required
 `instructors` child table. It grants operational permissions to manage the
-batch and host its live classes. A Biqat Instructor Profile is public
+batch and host its live classes. A Biqat Instructor Profile is public teacher
 attribution only and deliberately creates no login or permissions.
 
-The course-only profile selector initially matched the identically labelled
-New Batch field. It displayed a public teacher while leaving the required
-Frappe child table empty, causing `Data missing in table: Instructors`. The
-customization is now restricted to `/lms/courses`; batches retain the native
-user selector. Under Biqat's centralized workflow, the Biqat administrator is
-the internal batch manager while the assigned public profile remains the
-teacher shown on the course.
+Biqat keeps those concepts separate while presenting only managed teachers in
+the Batch form. The selected profiles are stored as Biqat batch attribution
+and returned on learner-facing batch cards and details. The currently logged-in
+Biqat administrator is silently retained as the internal batch manager needed
+by Frappe. This prevents `Data missing in table: Instructors` without exposing
+course-editor accounts in the teacher selector.
 
 The reusable instructor profile picker also closes on outside clicks in event
 capture phase, and the profile manager uses Frappe surface tokens so it follows
@@ -763,6 +762,7 @@ change.
 | `biqat_lms/setup/programs.py` | Program Member repair and count synchronization |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_profile/` | Public instructor profile DocType and tests |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_course/` | Instructor-to-course attribution child DocType |
+| `biqat_lms/biqat_learning/doctype/biqat_instructor_batch/` | Instructor-to-batch attribution child DocType |
 | `biqat_lms/tests/test_setup.py` | Installation, payment, rendering, and OAuth redirect tests |
 
 The upstream `apps/lms` checkout should remain pinned. Reusable changes belong
@@ -792,7 +792,7 @@ in `apps/biqat_lms`, not as untracked production edits inside `apps/lms`.
 
 ## 17. Validation performed
 
-The custom app currently has 19 automated tests covering, among other things:
+The custom app currently has 20 automated tests covering, among other things:
 
 - required app versions;
 - Ethiopian payment defaults;

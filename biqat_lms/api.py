@@ -5,15 +5,24 @@ import frappe
 from frappe import _
 from frappe.client import get_list as frappe_get_list
 from frappe.utils import cint, escape_html
+from lms.lms.api import get_created_batches as lms_get_created_batches
 from lms.lms.api import get_created_courses as lms_get_created_courses
+from lms.lms.api import get_my_batches as lms_get_my_batches
 from lms.lms.api import get_my_courses as lms_get_my_courses
 from lms.lms.api import get_profile_details as lms_get_profile_details
 from lms.lms.utils import (
+	can_modify_batch,
 	can_modify_course,
 	has_moderator_role,
 )
 from lms.lms.utils import (
 	enroll_in_program as lms_enroll_in_program,
+)
+from lms.lms.utils import (
+	get_batch_details as lms_get_batch_details,
+)
+from lms.lms.utils import (
+	get_batches as lms_get_batches,
 )
 from lms.lms.utils import (
 	get_course_details as lms_get_course_details,
@@ -162,6 +171,34 @@ def get_my_courses():
 	return courses
 
 
+@frappe.whitelist(allow_guest=True)
+def get_batches(filters: dict | None = None, start: int = 0, order_by: str = "start_date"):
+	"""Return batch cards with managed public instructors."""
+	batches = lms_get_batches(filters=filters, start=start, order_by=order_by)
+	return _apply_batch_experts(batches)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_batch_details(batch: str):
+	"""Return batch details with managed public instructors."""
+	details = lms_get_batch_details(batch)
+	if not details:
+		return details
+	return _apply_batch_experts([details])[0]
+
+
+@frappe.whitelist()
+def get_created_batches():
+	"""Return administrator Home batches with managed public instructors."""
+	return _apply_batch_experts(lms_get_created_batches())
+
+
+@frappe.whitelist()
+def get_my_batches():
+	"""Return learner Home batches with managed public instructors."""
+	return _apply_batch_experts(lms_get_my_batches())
+
+
 @frappe.whitelist()
 def get_program_details(program_name: str):
 	"""Return Program course cards with their public instructors."""
@@ -210,7 +247,9 @@ def get_course_experts(course: str):
 
 
 @frappe.whitelist()
-def list_instructor_profiles(search: str | None = None, course: str | None = None):
+def list_instructor_profiles(
+	search: str | None = None, course: str | None = None, batch: str | None = None
+):
 	"""List managed instructor profiles for the LMS-native management controls."""
 	_require_instructor_manager()
 	if search is not None and not isinstance(search, str):
@@ -244,6 +283,19 @@ def list_instructor_profiles(search: str | None = None, course: str | None = Non
 					"course": course,
 					"parenttype": "Biqat Instructor Profile",
 					"parentfield": "courses",
+				},
+				pluck="parent",
+			)
+		)
+	elif batch:
+		_validate_batch(batch)
+		selected = set(
+			frappe.get_all(
+				"Biqat Instructor Batch",
+				filters={
+					"batch": batch,
+					"parenttype": "Biqat Instructor Profile",
+					"parentfield": "batches",
 				},
 				pluck="parent",
 			)
@@ -347,6 +399,69 @@ def set_course_instructor_profiles(course: str, profiles: str | list[str] | None
 	return get_course_experts_map([course]).get(course, [])
 
 
+@frappe.whitelist()
+def set_batch_instructor_profiles(batch: str, profiles: str | list[str] | None = None):
+	"""Replace public batch attribution without granting batch permissions."""
+	_require_batch_manager(batch)
+	profile_names = json.loads(profiles) if isinstance(profiles, str) else (profiles or [])
+	if not isinstance(profile_names, list) or any(not isinstance(name, str) for name in profile_names):
+		frappe.throw(_("Invalid instructor selection."), frappe.ValidationError)
+
+	profile_names = list(dict.fromkeys(profile_names))
+	if profile_names:
+		valid_profiles = set(
+			frappe.get_all(
+				"Biqat Instructor Profile",
+				filters={"name": ["in", profile_names], "enabled": 1},
+				pluck="name",
+			)
+		)
+		missing = [name for name in profile_names if name not in valid_profiles]
+		if missing:
+			frappe.throw(
+				_("These instructor profiles are unavailable: {0}").format(", ".join(missing)),
+				frappe.ValidationError,
+			)
+
+	existing_profiles = set(
+		frappe.get_all(
+			"Biqat Instructor Batch",
+			filters={
+				"batch": batch,
+				"parenttype": "Biqat Instructor Profile",
+				"parentfield": "batches",
+			},
+			pluck="parent",
+		)
+	)
+	for profile_name in existing_profiles | set(profile_names):
+		doc = frappe.get_doc("Biqat Instructor Profile", profile_name)
+		doc.set("batches", [row for row in doc.batches if row.batch != batch])
+		if profile_name in profile_names:
+			doc.append(
+				"batches",
+				{
+					"batch": batch,
+					"role": _("Instructor"),
+					"display_order": (profile_names.index(profile_name) + 1) * 10,
+				},
+			)
+		doc.save()
+
+	return get_batch_experts_map([batch]).get(batch, [])
+
+
+def ensure_internal_batch_manager(doc, method=None):
+	"""Populate Frappe's required permission row without exposing it as the teacher."""
+	if doc.instructors:
+		return
+	if frappe.session.user == "Guest" or not (
+		frappe.session.user == "Administrator" or INSTRUCTOR_MANAGER_ROLES.intersection(frappe.get_roles())
+	):
+		return
+	doc.append("instructors", {"instructor": frappe.session.user})
+
+
 def _require_instructor_manager():
 	if frappe.session.user == "Administrator":
 		return
@@ -360,9 +475,20 @@ def _require_course_manager(course: str):
 		frappe.throw(_("You do not have permission to modify this course."), frappe.PermissionError)
 
 
+def _require_batch_manager(batch: str):
+	_validate_batch(batch)
+	if not can_modify_batch(batch):
+		frappe.throw(_("You do not have permission to modify this batch."), frappe.PermissionError)
+
+
 def _validate_course(course: str):
 	if not isinstance(course, str) or not frappe.db.exists("LMS Course", course):
 		frappe.throw(_("Course not found."), frappe.DoesNotExistError)
+
+
+def _validate_batch(batch: str):
+	if not isinstance(batch, str) or not frappe.db.exists("LMS Batch", batch):
+		frappe.throw(_("Batch not found."), frappe.DoesNotExistError)
 
 
 @frappe.whitelist()
@@ -413,6 +539,56 @@ def get_course_experts_map(course_names: list[str]) -> dict[str, list[frappe._di
 	for row in rows:
 		experts_by_course.setdefault(row.course, []).append(_format_course_expert(row))
 	return experts_by_course
+
+
+def get_batch_experts_map(batch_names: list[str]) -> dict[str, list[frappe._dict]]:
+	batch_names = list(dict.fromkeys(name for name in batch_names if name))
+	if not batch_names:
+		return {}
+
+	placeholders = ", ".join(["%s"] * len(batch_names))
+	rows = frappe.db.sql(
+		f"""
+			SELECT
+				assignment.batch,
+				assignment.role,
+				assignment.display_order,
+				profile.name AS profile_name,
+				profile.profile_slug,
+				profile.full_name,
+				profile.professional_title,
+				profile.organization,
+				profile.profile_image,
+				profile.cover_image,
+				profile.biography,
+				profile.linkedin
+			FROM `tabBiqat Instructor Batch` AS assignment
+			INNER JOIN `tabBiqat Instructor Profile` AS profile
+				ON profile.name = assignment.parent
+			WHERE assignment.parenttype = 'Biqat Instructor Profile'
+				AND assignment.parentfield = 'batches'
+				AND profile.enabled = 1
+				AND assignment.batch IN ({placeholders})
+			ORDER BY assignment.batch, assignment.display_order, assignment.idx
+		""",
+		tuple(batch_names),
+		as_dict=True,
+	)
+
+	experts_by_batch: dict[str, list[frappe._dict]] = {}
+	for row in rows:
+		experts_by_batch.setdefault(row.batch, []).append(_format_course_expert(row))
+	return experts_by_batch
+
+
+def _apply_batch_experts(batches: list) -> list:
+	experts_by_batch = get_batch_experts_map([batch.name for batch in batches])
+	for batch in batches:
+		experts = experts_by_batch.get(batch.name, [])
+		batch.biqat_experts = experts
+		if experts:
+			batch.instructors = experts
+	return batches
 
 
 def _format_course_expert(row: frappe._dict) -> frappe._dict:

@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "creation": "2026-08-16 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "batch",
+  "role",
+  "display_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "batch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Batch",
+   "options": "LMS Batch",
+   "reqd": 1
+  },
+  {
+   "default": "Instructor",
+   "fieldname": "role",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Public Role",
+   "options": "Lead Instructor\nInstructor\nSubject Matter Expert\nGuest Lecturer\nReviewer",
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "description": "Lower numbers appear first when a batch has several instructors.",
+   "fieldname": "display_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Display Order"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-16 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Biqat Learning",
+ "name": "Biqat Instructor Batch",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

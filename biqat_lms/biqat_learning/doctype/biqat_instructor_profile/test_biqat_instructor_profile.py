@@ -2,10 +2,13 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import add_days, nowdate
 from lms.lms.utils import can_modify_course
 
 from biqat_lms.api import (
 	enroll_in_program,
+	get_batch_details,
+	get_batch_experts_map,
 	get_course_details,
 	get_course_experts_map,
 	get_created_courses,
@@ -14,6 +17,7 @@ from biqat_lms.api import (
 	get_program_details,
 	list_instructor_profiles,
 	save_instructor_profile,
+	set_batch_instructor_profiles,
 	set_course_instructor_profiles,
 )
 from biqat_lms.setup.programs import sync_program_member_counts
@@ -51,6 +55,20 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 						"display_order": 1,
 					}
 				],
+			}
+		).insert(ignore_permissions=True)
+		self.batch = frappe.get_doc(
+			{
+				"doctype": "LMS Batch",
+				"title": f"Managed Instructor Batch {test_id}",
+				"description": "A batch used to verify public teacher attribution.",
+				"batch_details": "Managed instructor batch details.",
+				"start_date": add_days(nowdate(), 1),
+				"end_date": add_days(nowdate(), 2),
+				"start_time": "10:00:00",
+				"end_time": "11:00:00",
+				"timezone": "Africa/Addis_Ababa",
+				"medium": "Online",
 			}
 		).insert(ignore_permissions=True)
 		self.student = frappe.get_doc(
@@ -226,6 +244,32 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 			get_course_experts_map([self.course.name])[self.course.name][0].full_name,
 			"Ato Bekele Example",
 		)
+
+	def test_batch_profile_api_keeps_internal_manager_private(self):
+		batch_doc = frappe.get_doc("LMS Batch", self.batch.name)
+		self.assertEqual([row.instructor for row in batch_doc.instructors], ["Administrator"])
+
+		set_batch_instructor_profiles(self.batch.name, [self.profile.name])
+		profiles = list_instructor_profiles(batch=self.batch.name)
+		self.assertEqual([profile.name for profile in profiles if profile.selected], [self.profile.name])
+		self.assertEqual(
+			get_batch_experts_map([self.batch.name])[self.batch.name][0].full_name,
+			self.profile.full_name,
+		)
+
+		stock_details = frappe._dict(
+			{
+				"name": self.batch.name,
+				"instructors": [
+					frappe._dict({"name": "Administrator", "full_name": "Administrator"})
+				],
+			}
+		)
+		with patch("biqat_lms.api.lms_get_batch_details", return_value=stock_details):
+			details = get_batch_details(self.batch.name)
+
+		self.assertEqual(details.instructors[0].full_name, self.profile.full_name)
+		self.assertEqual(details.biqat_experts[0].profile_name, self.profile.name)
 
 	def test_student_cannot_manage_profiles(self):
 		frappe.set_user(self.student_email)

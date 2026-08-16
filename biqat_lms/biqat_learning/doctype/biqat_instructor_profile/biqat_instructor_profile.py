@@ -12,6 +12,7 @@ class BiqatInstructorProfile(Document):
 		self.full_name = (self.full_name or "").strip()
 		self.profile_slug = self._get_unique_slug(self.profile_slug or self.full_name)
 		self._validate_course_assignments()
+		self._validate_batch_assignments()
 
 	def _get_unique_slug(self, value: str) -> str:
 		base_slug = SLUG_SEPARATOR.sub("-", value.lower()).strip("-") or "instructor"
@@ -35,6 +36,16 @@ class BiqatInstructorProfile(Document):
 			if row.course in assigned_courses:
 				frappe.throw(_("Course {0} is assigned more than once.").format(frappe.bold(row.course)))
 			assigned_courses.add(row.course)
+			row.role = (row.role or _("Instructor")).strip()
+			if row.display_order is None:
+				row.display_order = 10
+
+	def _validate_batch_assignments(self):
+		assigned_batches = set()
+		for row in self.batches:
+			if row.batch in assigned_batches:
+				frappe.throw(_("Batch {0} is assigned more than once.").format(frappe.bold(row.batch)))
+			assigned_batches.add(row.batch)
 			row.role = (row.role or _("Instructor")).strip()
 			if row.display_order is None:
 				row.display_order = 10

@@ -150,6 +150,9 @@ doc_events = {
 	"Chapa Settings": {
 		"on_update": "biqat_lms.setup.payment_defaults.create_chapa_gateway",
 	},
+	"LMS Batch": {
+		"before_validate": "biqat_lms.api.ensure_internal_batch_manager",
+	},
 	"LMS Settings": {
 		"validate": "biqat_lms.setup.payment_defaults.validate_payment_configuration",
 	},
@@ -160,10 +163,14 @@ doc_events = {
 override_whitelisted_methods = {
 	"frappe.client.get_list": "biqat_lms.api.get_list",
 	"lms.lms.api.get_created_courses": "biqat_lms.api.get_created_courses",
+	"lms.lms.api.get_created_batches": "biqat_lms.api.get_created_batches",
+	"lms.lms.api.get_my_batches": "biqat_lms.api.get_my_batches",
 	"lms.lms.api.get_my_courses": "biqat_lms.api.get_my_courses",
 	"lms.lms.api.get_profile_details": "biqat_lms.api.get_profile_details",
 	"lms.lms.utils.get_course_details": "biqat_lms.api.get_course_details",
 	"lms.lms.utils.get_courses": "biqat_lms.api.get_courses",
+	"lms.lms.utils.get_batch_details": "biqat_lms.api.get_batch_details",
+	"lms.lms.utils.get_batches": "biqat_lms.api.get_batches",
 	"lms.lms.utils.enroll_in_program": "biqat_lms.api.enroll_in_program",
 	"lms.lms.utils.get_program_details": "biqat_lms.api.get_program_details",
 }

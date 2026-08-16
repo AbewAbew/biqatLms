@@ -20,7 +20,9 @@
   "biography_section",
   "biography",
   "courses_section",
-  "courses"
+  "courses",
+  "batches_section",
+  "batches"
  ],
  "fields": [
   {
@@ -113,6 +115,18 @@
    "fieldtype": "Table",
    "label": "Courses",
    "options": "Biqat Instructor Course"
+  },
+  {
+   "fieldname": "batches_section",
+   "fieldtype": "Section Break",
+   "label": "Batch Attribution"
+  },
+  {
+   "description": "These assignments control public attribution only. They do not grant batch management permission.",
+   "fieldname": "batches",
+   "fieldtype": "Table",
+   "label": "Batches",
+   "options": "Biqat Instructor Batch"
   }
  ],
  "links": [],
