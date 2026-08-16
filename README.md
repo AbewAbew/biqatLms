@@ -2,6 +2,12 @@
 
 Customizations and integrations for the Biqat Frappe Learning platform.
 
+The complete, dated technical handover for the initial installation and
+customization session is available in
+[`docs/IMPLEMENTATION_HISTORY.md`](docs/IMPLEMENTATION_HISTORY.md). It covers
+the local and cloud architecture, every completed customization, deployment,
+production troubleshooting, validation, and remaining work.
+
 ## Architecture
 
 The project deliberately separates source code from runtime data:

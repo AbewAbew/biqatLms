@@ -166,7 +166,7 @@ function installUiStyles() {
 			max-height: min(50rem, calc(100vh - 2rem));
 			overflow: auto;
 			border-radius: 0.875rem;
-			background: var(--surface-modal, #fff);
+			background: var(--surface-base, #fff);
 			box-shadow: 0 20px 60px rgb(0 0 0 / 0.24);
 			color: var(--ink-gray-9, #111827);
 		}
@@ -918,6 +918,11 @@ function refreshCourseInstructorPickers() {
 }
 
 async function ensureCourseInstructorPickers() {
+	// The LMS reuses the label "Instructors" for both courses and batches.
+	// Public instructor profiles replace course attribution only; batch instructors
+	// are real User rows that grant permission to manage and host the batch.
+	if (!/^\/lms\/courses(?:\/|$)/.test(window.location.pathname)) return;
+
 	for (const label of document.querySelectorAll("label")) {
 		const labelText = getLabelText(label);
 		if (!["Instructors", "Course editors"].includes(labelText)) continue;
@@ -1136,7 +1141,7 @@ function renderCourseInstructorPicker(picker, profiles, course) {
 	});
 	const closeOnOutside = (event) => {
 		if (!picker.isConnected) {
-			document.removeEventListener("pointerdown", closeOnOutside);
+			document.removeEventListener("pointerdown", closeOnOutside, true);
 			return;
 		}
 		if (picker.contains(event.target)) return;
@@ -1145,7 +1150,8 @@ function renderCourseInstructorPicker(picker, profiles, course) {
 		summary.setAttribute("aria-expanded", "false");
 		chevron.style.transform = "";
 	};
-	document.addEventListener("pointerdown", closeOnOutside);
+	// Capture the event before dialogs and Frappe controls stop propagation.
+	document.addEventListener("pointerdown", closeOnOutside, true);
 	picker.append(summary, options);
 	updateSummary();
 }
