@@ -167,6 +167,8 @@ override_whitelisted_methods = {
 	"lms.lms.api.get_created_batches": "biqat_lms.api.get_created_batches",
 	"lms.lms.api.get_my_batches": "biqat_lms.api.get_my_batches",
 	"lms.lms.api.get_my_courses": "biqat_lms.api.get_my_courses",
+	"lms.lms.api.get_admin_live_classes": "biqat_lms.api.get_admin_live_classes",
+	"lms.lms.api.get_my_live_classes": "biqat_lms.api.get_my_live_classes",
 	"lms.lms.api.get_profile_details": "biqat_lms.api.get_profile_details",
 	"lms.lms.doctype.lms_batch.lms_batch.create_google_meet_live_class": "biqat_lms.api.create_google_meet_live_class",
 	"lms.lms.utils.get_course_details": "biqat_lms.api.get_course_details",

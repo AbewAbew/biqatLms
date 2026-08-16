@@ -941,6 +941,24 @@ Syntactically invalid and duplicate addresses are excluded. Managed instructor
 profiles remain public course/batch attribution only and are not turned into
 Calendar attendees or login accounts.
 
+### 18.2 Live class cards showed "Invalid Date" for sessions scheduled before 10am
+
+Frappe returns `Time` fieldtype values as Python `timedelta` objects, whose
+default string form omits the leading zero on single-digit hours (`3:30:00`
+instead of `03:30:00`). The frontend builds `new Date(\`${date}T${time}\`)` in
+several places (`LiveClass.vue`, `AdminHome.vue`, `StudentHome.vue`); a
+single-digit hour makes that string invalid ISO 8601, and every browser
+silently returns an `Invalid Date`, rendered as "Invalid Date - Invalid Date"
+on the class card. This only affected classes scheduled between midnight and
+9:59am, which is why it went unnoticed until one was created in that window.
+
+`biqat_lms.api.normalize_time_fields()` zero-pads `time` in place and is
+applied everywhere `LMS Live Class` rows reach the browser: the generic
+`frappe.client.get_list` override (covers the per-Batch live class list), new
+overrides for `lms.lms.api.get_admin_live_classes` and
+`lms.lms.api.get_my_live_classes` (the Home dashboard cards), and Biqat's own
+`list_batch_live_classes` (the **Manage** dialog).
+
 Use a hard refresh (`Ctrl+Shift+R`) after frontend changes. If a PWA service
 worker still serves an old bundle, clear the site's browser storage and reload.
 
@@ -1019,6 +1037,21 @@ the browser's generic `417`:
 bench --site biqat.localhost execute biqat_lms.api.set_batch_instructor_profiles \
   --kwargs '{"batch":"<batch-name>","profiles":["<profile-name>"]}'
 ```
+
+### Live class card shows "Invalid Date - Invalid Date"
+
+The class was scheduled between midnight and 9:59am (see section 18.2).
+Confirm with:
+
+```bash
+bench --site biqat.localhost execute frappe.get_all \
+  --kwargs '{"doctype":"LMS Live Class","fields":["name","time"],"order_by":"creation desc","limit_page_length":5}'
+```
+
+A `time` value like `"3:30:00"` (missing the leading zero) confirms it.
+Deploy the latest `biqat_lms` commit — existing records self-correct the next
+time they're fetched, since the fix normalizes the value on the way out
+rather than rewriting the database.
 
 ### Program still displays zero members
 

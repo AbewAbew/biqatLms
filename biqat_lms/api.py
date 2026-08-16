@@ -1,3 +1,4 @@
+import datetime
 import json
 from typing import Any
 
@@ -5,10 +6,12 @@ import frappe
 from frappe import _
 from frappe.client import get_list as frappe_get_list
 from frappe.utils import cint, escape_html
+from lms.lms.api import get_admin_live_classes as lms_get_admin_live_classes
 from lms.lms.api import get_created_batches as lms_get_created_batches
 from lms.lms.api import get_created_courses as lms_get_created_courses
 from lms.lms.api import get_my_batches as lms_get_my_batches
 from lms.lms.api import get_my_courses as lms_get_my_courses
+from lms.lms.api import get_my_live_classes as lms_get_my_live_classes
 from lms.lms.api import get_profile_details as lms_get_profile_details
 from lms.lms.doctype.lms_batch.lms_batch import (
 	create_google_meet_live_class as lms_create_google_meet_live_class,
@@ -90,6 +93,9 @@ def get_list(
 
 	if doctype == "DocType" and _is_payment_gateway_settings_query(filters):
 		return [row for row in rows if _row_name(row) in ALLOWED_PAYMENT_GATEWAY_SETTINGS]
+
+	if doctype == "LMS Live Class":
+		normalize_time_fields(rows, ("time",))
 
 	return rows
 
@@ -201,6 +207,22 @@ def get_created_batches():
 def get_my_batches():
 	"""Return learner Home batches with managed public instructors."""
 	return _apply_batch_experts(lms_get_my_batches())
+
+
+@frappe.whitelist()
+def get_admin_live_classes():
+	"""Return administrator Home live classes with a correctly zero-padded time."""
+	classes = lms_get_admin_live_classes()
+	normalize_time_fields(classes, ("time",))
+	return classes
+
+
+@frappe.whitelist()
+def get_my_live_classes():
+	"""Return learner Home live classes with a correctly zero-padded time."""
+	classes = lms_get_my_live_classes()
+	normalize_time_fields(classes, ("time",))
+	return classes
 
 
 @frappe.whitelist()
@@ -500,7 +522,7 @@ def list_batch_live_classes(batch: str):
 	"""Return scheduled sessions with their actual saved timezone for administration."""
 	_require_live_class_administrator()
 	_validate_batch(batch)
-	return frappe.get_all(
+	classes = frappe.get_all(
 		"LMS Live Class",
 		filters={"batch_name": batch},
 		fields=[
@@ -515,6 +537,8 @@ def list_batch_live_classes(batch: str):
 		],
 		order_by="date asc, time asc",
 	)
+	normalize_time_fields(classes, ("time",))
+	return classes
 
 
 @frappe.whitelist()
@@ -664,6 +688,39 @@ def get_batch_experts_map(batch_names: list[str]) -> dict[str, list[frappe._dict
 	for row in rows:
 		experts_by_batch.setdefault(row.batch, []).append(_format_course_expert(row))
 	return experts_by_batch
+
+
+def normalize_time_fields(rows: list, fieldnames: tuple[str, ...]) -> None:
+	"""Zero-pad Time fieldtype values in place so `${date}T${time}` parses as valid ISO 8601.
+
+	Frappe returns Time fields as Python timedelta objects, whose default string
+	form (e.g. "3:30:00") omits the leading zero on single-digit hours. Browsers
+	reject that as an invalid ISO 8601 time when the frontend builds a Date from
+	"{date}T{time}", silently producing "Invalid Date" for any class scheduled
+	before 10am.
+	"""
+	for row in rows:
+		for fieldname in fieldnames:
+			value = row.get(fieldname) if isinstance(row, dict) else getattr(row, fieldname, None)
+			padded = _zero_pad_time(value)
+			if isinstance(row, dict):
+				row[fieldname] = padded
+			else:
+				setattr(row, fieldname, padded)
+
+
+def _zero_pad_time(value):
+	if isinstance(value, datetime.timedelta):
+		total_seconds = int(value.total_seconds())
+		hours, remainder = divmod(total_seconds, 3600)
+		minutes, seconds = divmod(remainder, 60)
+		return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+	if isinstance(value, str) and value:
+		parts = value.split(":")
+		if parts[0].strip().isdigit():
+			parts[0] = parts[0].strip().zfill(2)
+			return ":".join(parts)
+	return value
 
 
 def _apply_batch_experts(batches: list) -> list:

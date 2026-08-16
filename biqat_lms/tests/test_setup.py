@@ -1,10 +1,13 @@
+import datetime
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from lms import __version__ as lms_version
 from packaging.version import Version
 
 import biqat_lms.hooks as biqat_hooks
-from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list
+from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list, normalize_time_fields
 from biqat_lms.overrides.lms_live_class import BiqatLMSLiveClass
 from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
@@ -124,3 +127,37 @@ class TestBiqatLMSSetup(FrappeTestCase):
 			"biqat_lms.overrides.lms_live_class.BiqatLMSLiveClass",
 		)
 		self.assertIsInstance(frappe.new_doc("LMS Live Class"), BiqatLMSLiveClass)
+
+	def test_home_live_class_apis_use_zero_padded_time_wrapper(self):
+		self.assertEqual(
+			biqat_hooks.override_whitelisted_methods["lms.lms.api.get_admin_live_classes"],
+			"biqat_lms.api.get_admin_live_classes",
+		)
+		self.assertEqual(
+			biqat_hooks.override_whitelisted_methods["lms.lms.api.get_my_live_classes"],
+			"biqat_lms.api.get_my_live_classes",
+		)
+
+	def test_normalize_time_fields_zero_pads_single_digit_hours(self):
+		# Frappe returns Time fields as timedelta before serialization, and as an
+		# unpadded "H:MM:SS" string after: "3:30:00" fails Date's ISO 8601 parsing
+		# once the frontend builds "{date}T{time}", producing "Invalid Date".
+		timedelta_row = frappe._dict({"time": datetime.timedelta(hours=3, minutes=30)})
+		string_row = frappe._dict({"time": "3:30:00"})
+		padded_row = frappe._dict({"time": "10:45:00"})
+		empty_row = frappe._dict({"time": None})
+		rows = [timedelta_row, string_row, padded_row, empty_row]
+
+		normalize_time_fields(rows, ("time",))
+
+		self.assertEqual(timedelta_row.time, "03:30:00")
+		self.assertEqual(string_row.time, "03:30:00")
+		self.assertEqual(padded_row.time, "10:45:00")
+		self.assertIsNone(empty_row.time)
+
+	def test_get_list_zero_pads_live_class_time_for_the_batch_page(self):
+		stock_row = frappe._dict({"name": "LIVE-CLASS-TEST", "time": "3:30:00"})
+		with patch("biqat_lms.api.frappe_get_list", return_value=[stock_row]):
+			rows = get_list(doctype="LMS Live Class", fields=["name", "time"])
+
+		self.assertEqual(rows[0].time, "03:30:00")
