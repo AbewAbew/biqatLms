@@ -1767,11 +1767,33 @@ function currentExpertUsername() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-function findButtonByLabel(labels) {
-	for (const button of document.querySelectorAll("button")) {
-		if (labels.includes(button.textContent.trim())) return button;
+/**
+ * Find a tab by its visible text without assuming what element renders it:
+ * the tab bar is a third-party component, so its markup is not ours to rely on.
+ * Returns the deepest element holding exactly that label.
+ */
+function findTabLabel(labels) {
+	for (const element of document.querySelectorAll("button, a, [role='tab'], span, div, li")) {
+		const text = element.textContent.trim();
+		if (!labels.includes(text)) continue;
+		if ([...element.children].some((child) => child.textContent.trim() === text)) continue;
+		return element;
 	}
 	return null;
+}
+
+/** Climb to the outermost element that still contains only this label. */
+function tabWrapper(element) {
+	const text = element.textContent.trim();
+	let node = element;
+	while (
+		node.parentElement &&
+		node.parentElement !== document.body &&
+		node.parentElement.textContent.trim() === text
+	) {
+		node = node.parentElement;
+	}
+	return node;
 }
 
 /**
@@ -1851,24 +1873,24 @@ function getLmsBasePath() {
 async function ensureExpertProfileSections() {
 	if (!currentExpertUsername()) return;
 
-	const roles = findButtonByLabel(["Roles"]);
-	if (roles) roles.hidden = true;
+	const roles = findTabLabel(["Roles"]);
+	const rolesTab = roles && tabWrapper(roles);
+	// Only write when it would change, so this does not feed its own observer.
+	if (rolesTab && !rolesTab.hidden) rolesTab.hidden = true;
 
-	const coursesTab = findButtonByLabel(["Certificates", "Courses"]);
-	const about = findButtonByLabel(["About"]);
+	const coursesTab = findTabLabel(["Certificates", "Courses"]);
+	const about = findTabLabel(["About"]);
 	if (!coursesTab) return;
 
-	const label = [...coursesTab.querySelectorAll("span")].find(
-		(span) => !span.children.length && span.textContent.trim() === "Certificates"
-	);
-	if (label) label.textContent = "Courses";
-	else if (coursesTab.textContent.trim() === "Certificates") coursesTab.textContent = "Courses";
+	if (coursesTab.textContent.trim() === "Certificates") coursesTab.textContent = "Courses";
 
 	// The certificates route is now the courses tab, so replace what it renders.
 	if (!/\/certificates\/?$/.test(window.location.pathname)) return;
 	if (document.getElementById(EXPERT_COURSES_SECTION_ID)) return;
 
-	const container = findTabContainer([about, coursesTab].filter(Boolean));
+	const container = findTabContainer(
+		[about, coursesTab].filter(Boolean).map(tabWrapper)
+	);
 	const panel = container && findProfilePanel(container);
 	if (!panel) return;
 
