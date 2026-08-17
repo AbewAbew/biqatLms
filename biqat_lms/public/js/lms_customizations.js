@@ -17,6 +17,7 @@ const API_BASE = "/api/method/biqat_lms.api";
 const GRADING_API_BASE = "/api/method/biqat_lms.grading";
 const GRADING_PANEL_ID = "biqat-grading-panel";
 const GRADING_BUTTON_ID = "biqat-grading-button";
+const EXPERT_COURSES_SECTION_ID = "biqat-expert-courses";
 const SIDEBAR_TRANSLATIONS = Object.freeze({
 	Home: "መነሻ",
 	Search: "ፍለጋ",
@@ -371,6 +372,30 @@ function installUiStyles() {
 		}
 		.biqat-grading-summary:hover { background: var(--surface-gray-1, #f9fafb); }
 		.biqat-grading-row[data-open="true"] .lucide-chevron-down { transform: rotate(180deg); }
+		.biqat-expert-courses { margin-top: 2rem; }
+		.biqat-expert-courses-title {
+			font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;
+			color: var(--ink-gray-9, #111827);
+		}
+		.biqat-expert-course-list { display: grid; gap: 0.75rem; }
+		.biqat-expert-course {
+			display: flex; gap: 0.875rem; align-items: flex-start;
+			border: 1px solid var(--outline-gray-1, #e5e7eb); border-radius: 0.5rem;
+			padding: 0.75rem; text-decoration: none; color: inherit;
+		}
+		.biqat-expert-course:hover { border-color: var(--outline-gray-3, #9ca3af); }
+		.biqat-expert-course img {
+			width: 5rem; height: 3.5rem; object-fit: cover;
+			border-radius: 0.375rem; flex-shrink: 0;
+		}
+		.biqat-expert-course-text { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+		.biqat-expert-course-text strong { color: var(--ink-gray-9, #111827); }
+		.biqat-expert-course-intro {
+			font-size: 0.8125rem; color: var(--ink-gray-6, #4b5563); margin: 0;
+			display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+		}
+		.biqat-expert-course-text .biqat-grading-badge { align-self: flex-start; }
+
 		.biqat-grading-filters {
 			display: flex; flex-wrap: wrap; align-items: end; gap: 0.625rem;
 			padding-bottom: 0.875rem; margin-bottom: 0.5rem;
@@ -1737,6 +1762,114 @@ function markGradingRowSaved(row) {
 	row.querySelector(".biqat-grading-summary")?.setAttribute("aria-expanded", "false");
 }
 
+function currentExpertUsername() {
+	const match = window.location.pathname.match(/\/user\/(expert-[^/?#]+)/);
+	return match ? decodeURIComponent(match[1]) : null;
+}
+
+function findProfileTabGroup() {
+	for (const button of document.querySelectorAll("button")) {
+		if (button.textContent.trim() === "About" && button.parentElement) {
+			return button.parentElement;
+		}
+	}
+	return null;
+}
+
+/**
+ * A managed instructor has no User account, so "Certificates" (none earned) and
+ * "Roles" (a toggle list implying platform access they deliberately lack) say
+ * nothing true about them. Hide both and show the courses they teach instead.
+ */
+function hideIrrelevantExpertTabs() {
+	const group = findProfileTabGroup();
+	if (!group) return;
+	for (const button of group.querySelectorAll("button")) {
+		const label = button.textContent.trim();
+		if (label === "Certificates" || label === "Roles") button.hidden = true;
+	}
+}
+
+function renderExpertCourses(courses) {
+	const section = document.createElement("section");
+	section.id = EXPERT_COURSES_SECTION_ID;
+	section.className = "biqat-expert-courses";
+	section.append(createTextElement("h2", "Courses", "biqat-expert-courses-title"));
+
+	if (!courses.length) {
+		section.append(
+			createTextElement("p", "No published courses yet.", "biqat-muted")
+		);
+		return section;
+	}
+
+	const list = document.createElement("div");
+	list.className = "biqat-expert-course-list";
+	for (const course of courses) {
+		const card = document.createElement("a");
+		card.className = "biqat-expert-course";
+		card.href = `${getLmsBasePath()}/courses/${encodeURIComponent(course.name)}`;
+
+		if (course.image) {
+			const image = document.createElement("img");
+			image.src = course.image;
+			image.alt = "";
+			image.loading = "lazy";
+			card.append(image);
+		}
+
+		const text = document.createElement("div");
+		text.className = "biqat-expert-course-text";
+		text.append(createTextElement("strong", course.title || course.name));
+		if (course.role) text.append(createTextElement("span", course.role, "biqat-grading-badge"));
+		if (course.short_introduction) {
+			text.append(
+				createTextElement("p", course.short_introduction, "biqat-expert-course-intro")
+			);
+		}
+		card.append(text);
+		list.append(card);
+	}
+	section.append(list);
+	return section;
+}
+
+function getLmsBasePath() {
+	const match = window.location.pathname.match(/^(.*?)\/user\//);
+	return match ? match[1] : "/lms";
+}
+
+async function ensureExpertProfileSections() {
+	const username = currentExpertUsername();
+	if (!username) {
+		document.getElementById(EXPERT_COURSES_SECTION_ID)?.remove();
+		return;
+	}
+
+	hideIrrelevantExpertTabs();
+	if (document.getElementById(EXPERT_COURSES_SECTION_ID)) return;
+
+	const group = findProfileTabGroup();
+	const host = group?.parentElement;
+	if (!host) return;
+
+	// Claim the slot before awaiting so repeated DOM updates cannot insert twice.
+	const placeholder = document.createElement("section");
+	placeholder.id = EXPERT_COURSES_SECTION_ID;
+	host.append(placeholder);
+
+	let courses = [];
+	try {
+		courses = (await apiCall("get_expert_courses", { username })) || [];
+	} catch {
+		placeholder.remove();
+		return;
+	}
+
+	if (!document.body.contains(placeholder)) return;
+	placeholder.replaceWith(renderExpertCourses(courses));
+}
+
 // Ordered by how naturally "Grading" sits after each entry.
 const GRADING_ANCHOR_LABELS = [
 	"Assignments",
@@ -2128,6 +2261,7 @@ const observer = new MutationObserver(() => {
 		ensureUsersInstructorSection();
 		ensureCourseInstructorPickers();
 		ensureLiveClassManagerButton();
+		ensureExpertProfileSections();
 		updateScheduled = false;
 	});
 });
@@ -2143,6 +2277,7 @@ function initializeDomCustomizations() {
 	ensureUsersInstructorSection();
 	ensureCourseInstructorPickers();
 	ensureLiveClassManagerButton();
+	ensureExpertProfileSections();
 	observer.observe(document.body, { childList: true, subtree: true });
 	headObserver.observe(document.head, {
 		attributes: true,

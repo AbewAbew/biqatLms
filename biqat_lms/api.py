@@ -610,6 +610,46 @@ def get_profile_details(username: str):
 	return lms_get_profile_details(username)
 
 
+@frappe.whitelist(allow_guest=True)
+def get_expert_courses(username: str):
+	"""Published courses credited to a managed instructor, for their public profile.
+
+	A managed instructor has no User account, so the stock profile tabs
+	(certificates earned, LMS roles) describe nothing about them. The courses
+	they teach are the meaningful public record instead.
+	"""
+	if not isinstance(username, str) or not username:
+		return []
+
+	slug = username.removeprefix(EXPERT_USERNAME_PREFIX)
+	profile = frappe.db.get_value(
+		"Biqat Instructor Profile", {"profile_slug": slug, "enabled": 1}, "name"
+	)
+	if not profile:
+		return []
+
+	return frappe.db.sql(
+		"""
+			SELECT
+				course.name,
+				course.title,
+				course.image,
+				course.short_introduction,
+				assignment.role
+			FROM `tabBiqat Instructor Course` AS assignment
+			INNER JOIN `tabLMS Course` AS course
+				ON course.name = assignment.course
+			WHERE assignment.parent = %s
+				AND assignment.parenttype = 'Biqat Instructor Profile'
+				AND assignment.parentfield = 'courses'
+				AND course.published = 1
+			ORDER BY assignment.display_order, assignment.idx
+		""",
+		(profile,),
+		as_dict=True,
+	)
+
+
 def get_course_experts_map(course_names: list[str]) -> dict[str, list[frappe._dict]]:
 	course_names = list(dict.fromkeys(name for name in course_names if name))
 	if not course_names:

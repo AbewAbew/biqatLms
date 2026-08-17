@@ -13,6 +13,7 @@ from biqat_lms.api import (
 	get_batch_experts_map,
 	get_course_details,
 	get_course_experts_map,
+	get_expert_courses,
 	get_created_courses,
 	get_my_courses,
 	get_profile_details,
@@ -118,6 +119,22 @@ class TestBiqatInstructorProfile(FrappeTestCase):
 		self.assertEqual(details.headline, "Senior Legal Educator · Biqat Faculty Network")
 		self.assertNotIn("contact_email", details)
 		self.assertEqual(details.roles, [])
+
+	def test_expert_profile_lists_the_courses_they_teach(self):
+		frappe.set_user(self.student_email)
+		courses = get_expert_courses(f"expert-{self.profile.profile_slug}")
+
+		self.assertEqual([course.name for course in courses], [self.course.name])
+		self.assertEqual(courses[0].role, "Lead Instructor")
+
+	def test_expert_course_list_hides_unpublished_and_disabled_profiles(self):
+		frappe.db.set_value("LMS Course", self.course.name, "published", 0)
+		self.assertEqual(get_expert_courses(f"expert-{self.profile.profile_slug}"), [])
+
+		frappe.db.set_value("LMS Course", self.course.name, "published", 1)
+		self.profile.enabled = 0
+		self.profile.save(ignore_permissions=True)
+		self.assertEqual(get_expert_courses(f"expert-{self.profile.profile_slug}"), [])
 
 	def test_disabled_profiles_are_not_publicly_attributed(self):
 		self.profile.enabled = 0

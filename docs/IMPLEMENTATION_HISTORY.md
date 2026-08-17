@@ -713,7 +713,21 @@ editor, if none is set), and correctly address the email to enrolled/enabled
 users rather than the internal editor. The setting itself is left alone —
 administrators still control it from LMS Settings exactly as before.
 
-### 12.7 Grading by managed instructors and staff
+### 12.7 The public instructor profile shows courses, not account tabs
+
+The stock profile page offers **Certificates** and **Roles** tabs. Both describe
+a Frappe User: certificates that user has earned as a learner, and toggles for
+the LMS roles they hold. A managed instructor has no User account, so the first
+is always empty and the second implies platform access they deliberately lack —
+actively misleading on a public page.
+
+`biqat_lms.api.get_expert_courses()` returns the published courses credited to
+the profile, and the customization script hides both tabs on `/user/expert-*`
+routes and appends a course list instead. The endpoint allows guests, since
+instructor profiles are public, and filters out unpublished courses and
+disabled profiles.
+
+### 12.8 Grading by managed instructors and staff
 
 Frappe Learning only lets `PRIVILEGED_ROLES` (Moderator, Course Creator, Batch
 Evaluator, System Manager) grade a submission, and those roles carry broad Desk
