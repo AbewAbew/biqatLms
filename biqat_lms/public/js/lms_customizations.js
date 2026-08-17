@@ -1767,55 +1767,24 @@ function currentExpertUsername() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-/**
- * Find a tab by its visible text without assuming what element renders it:
- * the tab bar is a third-party component, so its markup is not ours to rely on.
- * Returns the deepest element holding exactly that label.
- */
-function findTabLabel(labels) {
-	for (const element of document.querySelectorAll("button, a, [role='tab'], span, div, li")) {
-		const text = element.textContent.trim();
-		if (!labels.includes(text)) continue;
-		if ([...element.children].some((child) => child.textContent.trim() === text)) continue;
-		return element;
-	}
-	return null;
+// The profile tab bar marks its own buttons; matching on label text alone would
+// also hit the sidebar's "Courses" link, which appears earlier in the document.
+const PROFILE_TAB_SELECTOR = 'button[data-slot="tab-button"]';
+
+function profileTabLabel(button) {
+	const spans = [...button.querySelectorAll("span")].filter(
+		(span) => !span.children.length && span.textContent.trim()
+	);
+	return spans[spans.length - 1] || button;
 }
 
-/** Climb to the outermost element that still contains only this label. */
-function tabWrapper(element) {
-	const text = element.textContent.trim();
-	let node = element;
-	while (
-		node.parentElement &&
-		node.parentElement !== document.body &&
-		node.parentElement.textContent.trim() === text
-	) {
-		node = node.parentElement;
-	}
-	return node;
-}
-
-/**
- * The tab bar is the nearest ancestor containing every tab button; each button
- * sits in its own wrapper, so a button's parent is not the bar.
- */
-function findTabContainer(buttons) {
-	let node = buttons[0];
-	while (node) {
-		if (buttons.every((button) => node.contains(button))) return node;
-		node = node.parentElement;
-	}
-	return null;
-}
-
-function findProfilePanel(container) {
-	let node = container;
-	while (node) {
-		if (node.nextElementSibling) return node.nextElementSibling;
-		node = node.parentElement;
-	}
-	return null;
+/** The routed panel is the sibling that follows the whole tab bar. */
+function findProfilePanel(button) {
+	const page = button.closest(".max-w-4xl");
+	if (!page) return null;
+	let node = button;
+	while (node.parentElement && node.parentElement !== page) node = node.parentElement;
+	return node.nextElementSibling;
 }
 
 function renderExpertCourses(courses) {
@@ -1873,25 +1842,33 @@ function getLmsBasePath() {
 async function ensureExpertProfileSections() {
 	if (!currentExpertUsername()) return;
 
-	const roles = findTabLabel(["Roles"]);
-	const rolesTab = roles && tabWrapper(roles);
-	// Only write when it would change, so this does not feed its own observer.
-	if (rolesTab && !rolesTab.hidden) rolesTab.hidden = true;
+	const tabs = [...document.querySelectorAll(PROFILE_TAB_SELECTOR)];
+	if (!tabs.length) return;
 
-	const coursesTab = findTabLabel(["Certificates", "Courses"]);
-	const about = findTabLabel(["About"]);
-	if (!coursesTab) return;
-
-	if (coursesTab.textContent.trim() === "Certificates") coursesTab.textContent = "Courses";
+	let coursesTab = null;
+	for (const button of tabs) {
+		const label = profileTabLabel(button);
+		const text = label.textContent.trim();
+		if (text === "Roles") {
+			// The button sets `display` through a utility class, which outranks
+			// the `hidden` attribute's user-agent rule.
+			if (button.style.display !== "none") button.style.display = "none";
+		} else if (text === "Certificates") {
+			label.textContent = "Courses";
+			coursesTab = button;
+		} else if (text === "Courses") {
+			coursesTab = button;
+		}
+	}
 
 	// The certificates route is now the courses tab, so replace what it renders.
-	if (!/\/certificates\/?$/.test(window.location.pathname)) return;
+	if (!/\/certificates\/?$/.test(window.location.pathname)) {
+		document.getElementById(EXPERT_COURSES_SECTION_ID)?.remove();
+		return;
+	}
 	if (document.getElementById(EXPERT_COURSES_SECTION_ID)) return;
 
-	const container = findTabContainer(
-		[about, coursesTab].filter(Boolean).map(tabWrapper)
-	);
-	const panel = container && findProfilePanel(container);
+	const panel = coursesTab && findProfilePanel(coursesTab);
 	if (!panel) return;
 
 	// Claim the slot before awaiting so repeated DOM updates cannot insert twice.

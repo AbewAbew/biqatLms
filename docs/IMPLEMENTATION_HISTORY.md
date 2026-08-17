@@ -728,9 +728,16 @@ renders with the course list. The endpoint allows guests, since instructor
 profiles are public, and filters out unpublished courses and disabled
 profiles.
 
-The tab bar is located by finding the nearest ancestor containing every tab
-button: `TabButtons` wraps each button separately, so a button's parent is not
-the bar.
+Two things this code must respect, both found the hard way:
+
+- Tabs are located through `button[data-slot="tab-button"]`, not by searching
+  the document for label text. The sidebar has its own **Courses** link which
+  appears earlier in document order, so a text search matches that instead —
+  which left the real tab untouched and mounted the course list against a
+  container derived from the sidebar.
+- Hiding a tab requires `style.display`, not the `hidden` attribute: the
+  buttons carry an `inline-flex` utility class, and an explicit `display` rule
+  outranks the user agent's rule for `hidden`.
 
 ### 12.8 Grading by managed instructors and staff
 
