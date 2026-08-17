@@ -769,6 +769,24 @@ Custom fields on the upstream doctypes are created by
 future Frappe Learning release adding its own `graded`/`feedback` fields cannot
 collide.
 
+#### The queue at volume
+
+Assignments and open-ended quiz answers are merged into one list ordered
+oldest-first, so work is done in the order learners submitted and paging
+behaves coherently across both sources. `list_gradings()` accepts course,
+instructor, status, type and a learner/title search, and returns one page plus
+a total; each source is capped at `MAX_PENDING_ROWS` before merging, which
+keeps the query simple at realistic backlog sizes.
+
+Rows collapse to title, learner, course and date, and build their detail only
+when opened — a queue that expands every prompt inline is unusable past a
+handful of submissions.
+
+Graded work stays reachable through the status filter and can be re-graded;
+both write APIs overwrite rather than insert. Without this a mistaken grade
+would be permanent, since a graded item leaves the pending queue. After a save
+the row stays in place, marked saved, rather than disappearing.
+
 Note: the stock quiz-grading screens (`QuizSubmissionList.vue`,
 `QuizSubmission.vue`) show a marks field to instructors, but `LMS Quiz
 Submission` grants write permission to System Manager only, so that path likely

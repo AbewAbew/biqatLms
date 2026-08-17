@@ -5,9 +5,11 @@ from frappe.tests.utils import FrappeTestCase
 
 from biqat_lms.grading import (
 	get_grading_context,
+	get_grading_filters,
+	get_pending_count,
 	grade_assignment_submission,
 	grade_quiz_answer,
-	list_pending_gradings,
+	list_gradings,
 	notify_instructor_of_assignment,
 	set_my_notification_preference,
 )
@@ -54,21 +56,27 @@ class TestBiqatGrading(FrappeTestCase):
 			}
 		).insert(ignore_permissions=True)
 
-		for email, first_name in (
-			(self.instructor_email, "Grading"),
-			(self.outsider_email, "Outsider"),
-			(self.student_email, "Student"),
-		):
-			frappe.get_doc(
-				{
-					"doctype": "User",
-					"email": email,
-					"first_name": first_name,
-					"enabled": 1,
-					"user_type": "Website User",
-					"send_welcome_email": 0,
-				}
-			).insert(ignore_permissions=True)
+		# These cases need several users each; Frappe throttles User creation to
+		# 60/hour, which a full run of this suite would otherwise exceed.
+		frappe.flags.in_import = True
+		try:
+			for email, first_name in (
+				(self.instructor_email, "Grading"),
+				(self.outsider_email, "Outsider"),
+				(self.student_email, "Student"),
+			):
+				frappe.get_doc(
+					{
+						"doctype": "User",
+						"email": email,
+						"first_name": first_name,
+						"enabled": 1,
+						"user_type": "Website User",
+						"send_welcome_email": 0,
+					}
+				).insert(ignore_permissions=True)
+		finally:
+			frappe.flags.in_import = False
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -166,7 +174,7 @@ class TestBiqatGrading(FrappeTestCase):
 	def test_unrelated_user_cannot_reach_the_grading_queue(self):
 		frappe.set_user(self.outsider_email)
 		with self.assertRaises(frappe.PermissionError):
-			list_pending_gradings()
+			list_gradings()
 
 	def test_disabled_profile_loses_grading_access(self):
 		self.profile.enabled = 0
@@ -174,7 +182,7 @@ class TestBiqatGrading(FrappeTestCase):
 
 		frappe.set_user(self.instructor_email)
 		with self.assertRaises(frappe.PermissionError):
-			list_pending_gradings()
+			list_gradings()
 
 	# -- queue scoping ----------------------------------------------------
 
@@ -183,25 +191,117 @@ class TestBiqatGrading(FrappeTestCase):
 		theirs = self._create_assignment_submission(course=self.other_course.name)
 
 		frappe.set_user(self.instructor_email)
-		pending = list_pending_gradings()
+		pending = list_gradings()
 
-		names = [row["name"] for row in pending["assignments"]]
-		self.assertIn(mine.name, names)
-		self.assertNotIn(theirs.name, names)
+		ids = [row["id"] for row in pending["rows"]]
+		self.assertIn(mine.name, ids)
+		self.assertNotIn(theirs.name, ids)
 
 		# The collapsed queue row identifies the course without opening it.
-		row = next(row for row in pending["assignments"] if row["name"] == mine.name)
+		row = next(row for row in pending["rows"] if row["id"] == mine.name)
 		self.assertEqual(row["course_title"], self.course.title)
 
 	def test_open_ended_answers_appear_in_the_queue(self):
 		submission = self._create_open_ended_quiz_submission()
 
 		frappe.set_user(self.instructor_email)
-		pending = list_pending_gradings()
+		rows = [row for row in list_gradings()["rows"] if row["kind"] == "quiz"]
 
-		self.assertEqual(len(pending["quiz_answers"]), 1)
-		self.assertEqual(pending["quiz_answers"][0].submission, submission.name)
-		self.assertEqual(pending["quiz_answers"][0].course_title, self.course.title)
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0]["course_title"], self.course.title)
+
+	def test_staff_can_filter_the_queue_by_course(self):
+		mine = self._create_assignment_submission()
+		theirs = self._create_assignment_submission(course=self.other_course.name)
+
+		frappe.set_user("Administrator")
+		unfiltered = [row["id"] for row in list_gradings()["rows"]]
+		self.assertIn(mine.name, unfiltered)
+		self.assertIn(theirs.name, unfiltered)
+
+		filtered = list_gradings(course=self.other_course.name)
+		self.assertEqual([row["id"] for row in filtered["rows"]], [theirs.name])
+
+	def test_staff_can_filter_the_queue_by_instructor(self):
+		mine = self._create_assignment_submission()
+		theirs = self._create_assignment_submission(course=self.other_course.name)
+
+		frappe.set_user("Administrator")
+		filtered = list_gradings(instructor=self.profile.name)
+
+		ids = [row["id"] for row in filtered["rows"]]
+		self.assertIn(mine.name, ids)
+		self.assertNotIn(theirs.name, ids)
+
+	def test_search_matches_the_learner(self):
+		submission = self._create_assignment_submission()
+
+		frappe.set_user("Administrator")
+		self.assertIn(
+			submission.name, [row["id"] for row in list_gradings(search="Student")["rows"]]
+		)
+		self.assertEqual(list_gradings(search="nobody-by-this-name")["rows"], [])
+
+	def test_queue_pages_oldest_first(self):
+		first = self._create_assignment_submission()
+		second = self._create_assignment_submission()
+
+		frappe.set_user("Administrator")
+		page = list_gradings(course=self.course.name, page_length=1)
+
+		self.assertEqual([row["id"] for row in page["rows"]], [first.name])
+		self.assertEqual(page["total"], 2)
+		self.assertTrue(page["has_more"])
+
+		page_two = list_gradings(course=self.course.name, page_length=1, start=1)
+		self.assertEqual([row["id"] for row in page_two["rows"]], [second.name])
+		self.assertFalse(page_two["has_more"])
+
+	def test_graded_work_stays_reachable_for_correction(self):
+		submission = self._create_assignment_submission()
+		frappe.set_user("Administrator")
+		grade_assignment_submission(submission.name, "Fail", "Missed the point.")
+
+		self.assertNotIn(
+			submission.name, [row["id"] for row in list_gradings(status="pending")["rows"]]
+		)
+
+		graded = list_gradings(status="graded")["rows"]
+		row = next(row for row in graded if row["id"] == submission.name)
+		self.assertEqual(row["status"], "Fail")
+		self.assertEqual(row["attributed_instructor_name"], self.profile.full_name)
+
+		# A grader can revise their own call.
+		grade_assignment_submission(submission.name, "Pass", "Revised after review.")
+		self.assertEqual(
+			frappe.db.get_value("LMS Assignment Submission", submission.name, "status"), "Pass"
+		)
+
+	def test_pending_count_tracks_the_queue(self):
+		frappe.set_user("Administrator")
+		before = get_pending_count()["count"]
+
+		submission = self._create_assignment_submission()
+		self.assertEqual(get_pending_count()["count"], before + 1)
+
+		grade_assignment_submission(submission.name, "Pass")
+		self.assertEqual(get_pending_count()["count"], before)
+
+	def test_filter_options_respect_the_graders_scope(self):
+		frappe.set_user(self.instructor_email)
+		options = get_grading_filters()
+
+		course_names = [row["name"] for row in options["courses"]]
+		self.assertIn(self.course.name, course_names)
+		self.assertNotIn(self.other_course.name, course_names)
+		self.assertEqual(options["instructors"], [])
+
+		frappe.set_user("Administrator")
+		staff_options = get_grading_filters()
+		self.assertIn(
+			self.other_course.name, [row["name"] for row in staff_options["courses"]]
+		)
+		self.assertIn(self.profile.name, [row["name"] for row in staff_options["instructors"]])
 
 	# -- assignment grading ----------------------------------------------
 
@@ -306,7 +406,7 @@ class TestBiqatGrading(FrappeTestCase):
 		frappe.set_user(self.instructor_email)
 		grade_quiz_answer(result, 5)
 
-		self.assertEqual(list_pending_gradings()["quiz_answers"], [])
+		self.assertEqual([r for r in list_gradings()["rows"] if r["kind"] == "quiz"], [])
 
 	def test_marks_cannot_exceed_the_allotted_total(self):
 		submission = self._create_open_ended_quiz_submission()

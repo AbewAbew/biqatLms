@@ -371,6 +371,27 @@ function installUiStyles() {
 		}
 		.biqat-grading-summary:hover { background: var(--surface-gray-1, #f9fafb); }
 		.biqat-grading-row[data-open="true"] .lucide-chevron-down { transform: rotate(180deg); }
+		.biqat-grading-filters {
+			display: flex; flex-wrap: wrap; align-items: end; gap: 0.625rem;
+			padding-bottom: 0.875rem; margin-bottom: 0.5rem;
+			border-bottom: 1px solid var(--outline-gray-1, #e5e7eb);
+		}
+		.biqat-grading-filter { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.75rem; color: var(--ink-gray-5, #6b7280); }
+		.biqat-grading-filter select, .biqat-grading-search {
+			border: 1px solid var(--outline-gray-2, #d1d5db); border-radius: 0.375rem;
+			padding: 0.375rem 0.5rem; font: inherit; font-size: 0.875rem;
+			background: var(--surface-white, #fff); color: var(--ink-gray-8, #1f2937);
+		}
+		.biqat-grading-search { flex: 1; min-width: 12rem; }
+		.biqat-grading-count { font-size: 0.75rem; color: var(--ink-gray-5, #6b7280); margin-bottom: 0.5rem; }
+		.biqat-grading-more { display: block; width: 100%; margin-top: 0.25rem; }
+		.biqat-grading-row[data-saved="true"] { border-color: var(--outline-green-2, #86efac); }
+		.biqat-grading-title-row { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; min-width: 0; }
+		.biqat-grading-badge {
+			font-size: 0.6875rem; padding: 0.0625rem 0.375rem; border-radius: 0.25rem;
+			background: var(--surface-gray-2, #f3f4f6); color: var(--ink-gray-6, #4b5563);
+			white-space: nowrap;
+		}
 		.biqat-grading-heading { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; flex: 1; }
 		.biqat-grading-title {
 			color: var(--ink-gray-9, #111827); overflow: hidden;
@@ -1266,20 +1287,181 @@ function createGradingPanelShell() {
 	return backdrop;
 }
 
+const GRADING_PAGE_LENGTH = 20;
+let gradingQuery = {};
+
 async function openGradingPanel() {
 	const shell = createGradingPanelShell();
 	const body = shell.querySelector(".biqat-modal-body");
 	body.textContent = "Loading submissions…";
+	gradingQuery = { status: "pending", course: "", instructor: "", kind: "", search: "", start: 0 };
 	try {
 		const context = (await resolveGradingContext()) || {};
-		const pending = await gradingCall("list_pending_gradings");
-		renderGradingPanel(shell, pending, context);
+		const options = await gradingCall("get_grading_filters");
+		body.replaceChildren();
+		if (context.kind === "instructor") body.append(createNotificationToggle(context));
+		body.append(buildGradingFilterBar(context, options));
+
+		const list = document.createElement("div");
+		list.className = "biqat-grading-list";
+		body.append(list);
+		await refreshGradingList(shell, context);
 	} catch (error) {
 		body.textContent = error.message;
 	}
 }
 
-function createAttributionSelect(context) {
+function createFilterSelect(label, values, onChange) {
+	const wrapper = document.createElement("label");
+	wrapper.className = "biqat-grading-filter";
+	wrapper.append(createTextElement("span", label));
+	const select = document.createElement("select");
+	for (const { value, text } of values) {
+		const option = document.createElement("option");
+		option.value = value;
+		option.textContent = text;
+		select.append(option);
+	}
+	select.addEventListener("change", () => onChange(select.value));
+	wrapper.append(select);
+	return wrapper;
+}
+
+function buildGradingFilterBar(context, options) {
+	const bar = document.createElement("div");
+	bar.className = "biqat-grading-filters";
+	const rerun = () => {
+		gradingQuery.start = 0;
+		const shell = document.getElementById(GRADING_PANEL_ID);
+		if (shell) refreshGradingList(shell, context);
+	};
+
+	const search = document.createElement("input");
+	search.type = "search";
+	search.placeholder = "Search learner or title";
+	search.className = "biqat-grading-search";
+	let searchTimer;
+	search.addEventListener("input", () => {
+		clearTimeout(searchTimer);
+		searchTimer = setTimeout(() => {
+			gradingQuery.search = search.value.trim();
+			rerun();
+		}, 300);
+	});
+	bar.append(search);
+
+	bar.append(
+		createFilterSelect(
+			"Status",
+			[
+				{ value: "pending", text: "Pending" },
+				{ value: "graded", text: "Graded" },
+				{ value: "all", text: "All" },
+			],
+			(value) => {
+				gradingQuery.status = value;
+				rerun();
+			}
+		)
+	);
+
+	bar.append(
+		createFilterSelect(
+			"Type",
+			[
+				{ value: "", text: "All types" },
+				{ value: "assignment", text: "Assignments" },
+				{ value: "quiz", text: "Quiz answers" },
+			],
+			(value) => {
+				gradingQuery.kind = value;
+				rerun();
+			}
+		)
+	);
+
+	if (options.courses?.length) {
+		bar.append(
+			createFilterSelect(
+				"Course",
+				[{ value: "", text: "All courses" }].concat(
+					options.courses.map((course) => ({ value: course.name, text: course.title }))
+				),
+				(value) => {
+					gradingQuery.course = value;
+					rerun();
+				}
+			)
+		);
+	}
+
+	if (options.instructors?.length) {
+		bar.append(
+			createFilterSelect(
+				"Instructor",
+				[{ value: "", text: "All instructors" }].concat(
+					options.instructors.map((row) => ({ value: row.name, text: row.full_name }))
+				),
+				(value) => {
+					gradingQuery.instructor = value;
+					rerun();
+				}
+			)
+		);
+	}
+
+	return bar;
+}
+
+async function refreshGradingList(shell, context, append = false) {
+	const list = shell.querySelector(".biqat-grading-list");
+	if (!list) return;
+	if (!append) {
+		list.replaceChildren(createTextElement("p", "Loading…", "biqat-muted"));
+	}
+
+	let page;
+	try {
+		page = await gradingCall("list_gradings", {
+			...gradingQuery,
+			page_length: GRADING_PAGE_LENGTH,
+		});
+	} catch (error) {
+		list.replaceChildren(createTextElement("p", error.message, "biqat-muted"));
+		return;
+	}
+
+	if (!append) list.replaceChildren();
+	list.querySelector(".biqat-grading-more")?.remove();
+	list.querySelector(".biqat-grading-count")?.remove();
+
+	if (!page.total) {
+		list.append(createTextElement("p", "Nothing matches these filters.", "biqat-muted"));
+		return;
+	}
+
+	const shown = Math.min(gradingQuery.start + page.rows.length, page.total);
+	list.append(
+		createTextElement("p", `Showing ${shown} of ${page.total}`, "biqat-grading-count")
+	);
+
+	for (const row of page.rows) {
+		list.append(row.kind === "quiz" ? renderQuizAnswerRow(row, context) : renderAssignmentRow(row, context));
+	}
+
+	if (page.has_more) {
+		const more = createTextElement("button", "Load more", "biqat-button biqat-grading-more");
+		more.type = "button";
+		more.addEventListener("click", () => {
+			gradingQuery.start += GRADING_PAGE_LENGTH;
+			more.remove();
+			refreshGradingList(shell, context, true);
+		});
+		list.append(more);
+	}
+}
+
+function createAttributionSelect(context, selected) {
 	// Staff record a grade on behalf of the expert who actually made the call;
 	// an instructor always credits themselves, so the control is theirs only.
 	if (!context.can_attribute) return null;
@@ -1297,14 +1479,37 @@ function createAttributionSelect(context) {
 		option.textContent = instructor.full_name;
 		select.append(option);
 	}
+	if (selected) select.value = selected;
 	wrapper.append(select);
 	wrapper.selectElement = select;
 	return wrapper;
 }
 
+function createNotificationToggle(context) {
+	const wrapper = document.createElement("label");
+	wrapper.className = "biqat-grading-toggle";
+	const checkbox = document.createElement("input");
+	checkbox.type = "checkbox";
+	checkbox.checked = Boolean(context.notify_on_submission);
+	checkbox.addEventListener("change", async () => {
+		checkbox.disabled = true;
+		try {
+			await gradingCall("set_my_notification_preference", { enabled: checkbox.checked ? 1 : 0 });
+			context.notify_on_submission = checkbox.checked ? 1 : 0;
+		} catch (error) {
+			checkbox.checked = !checkbox.checked;
+			alert(error.message);
+		} finally {
+			checkbox.disabled = false;
+		}
+	});
+	wrapper.append(checkbox, createTextElement("span", "Email me when a learner submits work"));
+	return wrapper;
+}
+
 function formatSubmittedOn(value) {
 	if (!value) return "";
-	const date = new Date(value.replace(" ", "T"));
+	const date = new Date(String(value).replace(" ", "T"));
 	return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
 }
 
@@ -1313,7 +1518,7 @@ function formatSubmittedOn(value) {
  * expanded, so each row collapses to title/learner/course/date and builds its
  * detail only when opened.
  */
-function createGradingRow({ title, learner, course, submitted, buildDetail }) {
+function createGradingRow({ title, learner, course, submitted, badges, buildDetail }) {
 	const row = document.createElement("article");
 	row.className = "biqat-grading-row";
 
@@ -1324,8 +1529,14 @@ function createGradingRow({ title, learner, course, submitted, buildDetail }) {
 
 	const heading = document.createElement("div");
 	heading.className = "biqat-grading-heading";
+	const titleRow = document.createElement("div");
+	titleRow.className = "biqat-grading-title-row";
+	titleRow.append(createTextElement("strong", title || "Untitled", "biqat-grading-title"));
+	for (const badge of badges || []) {
+		if (badge) titleRow.append(createTextElement("span", badge, "biqat-grading-badge"));
+	}
 	heading.append(
-		createTextElement("strong", title || "Untitled", "biqat-grading-title"),
+		titleRow,
 		createTextElement(
 			"span",
 			[learner, course, formatSubmittedOn(submitted)].filter(Boolean).join(" · "),
@@ -1370,65 +1581,20 @@ function createSubmissionDetail(prompt, answer, controls) {
 	return fragment;
 }
 
-function renderGradingPanel(shell, pending, context) {
-	const body = shell.querySelector(".biqat-modal-body");
-	body.replaceChildren();
-
-	if (context.kind === "instructor") {
-		body.append(createNotificationToggle(context));
-	}
-
-	const assignments = pending?.assignments || [];
-	const quizAnswers = pending?.quiz_answers || [];
-
-	if (!assignments.length && !quizAnswers.length) {
-		body.append(createTextElement("p", "Nothing is waiting for review.", "biqat-muted"));
-		return;
-	}
-
-	if (assignments.length) {
-		body.append(createTextElement("h3", "Assignments", "biqat-grading-section"));
-		for (const submission of assignments) {
-			body.append(renderAssignmentRow(submission, context));
-		}
-	}
-
-	if (quizAnswers.length) {
-		body.append(createTextElement("h3", "Open-ended quiz answers", "biqat-grading-section"));
-		for (const answer of quizAnswers) {
-			body.append(renderQuizAnswerRow(answer, context));
-		}
-	}
-}
-
-function createNotificationToggle(context) {
-	const wrapper = document.createElement("label");
-	wrapper.className = "biqat-grading-toggle";
-	const checkbox = document.createElement("input");
-	checkbox.type = "checkbox";
-	checkbox.checked = Boolean(context.notify_on_submission);
-	checkbox.addEventListener("change", async () => {
-		checkbox.disabled = true;
-		try {
-			await gradingCall("set_my_notification_preference", { enabled: checkbox.checked ? 1 : 0 });
-			context.notify_on_submission = checkbox.checked ? 1 : 0;
-		} catch (error) {
-			checkbox.checked = !checkbox.checked;
-			alert(error.message);
-		} finally {
-			checkbox.disabled = false;
-		}
-	});
-	wrapper.append(checkbox, createTextElement("span", "Email me when a learner submits work"));
-	return wrapper;
+function gradedBadges(row) {
+	const badges = [row.kind === "quiz" ? "Quiz" : "Assignment"];
+	if (row.status && row.status !== "Not Graded") badges.push(row.status);
+	if (row.attributed_instructor_name) badges.push(row.attributed_instructor_name);
+	return badges;
 }
 
 function renderAssignmentRow(submission, context) {
 	const row = createGradingRow({
-		title: submission.assignment_title,
-		learner: submission.member_name || submission.member,
+		title: submission.title,
+		learner: submission.learner,
 		course: submission.course_title,
-		submitted: submission.creation,
+		submitted: submission.submitted,
+		badges: gradedBadges(submission),
 		buildDetail: () => {
 			const controls = document.createElement("div");
 			controls.className = "biqat-grading-controls";
@@ -1436,8 +1602,9 @@ function renderAssignmentRow(submission, context) {
 			const comments = document.createElement("textarea");
 			comments.rows = 2;
 			comments.placeholder = "Feedback for the learner (optional)";
+			comments.value = stripHtml(submission.feedback);
 
-			const attribution = createAttributionSelect(context);
+			const attribution = createAttributionSelect(context, submission.attributed_instructor);
 			const actions = document.createElement("div");
 			actions.className = "biqat-grading-actions";
 			const status = document.createElement("select");
@@ -1447,6 +1614,8 @@ function renderAssignmentRow(submission, context) {
 				option.textContent = value;
 				status.append(option);
 			}
+			if (submission.status && submission.status !== "Not Graded") status.value = submission.status;
+
 			const save = createTextElement("button", "Save grade", "biqat-button biqat-button-solid");
 			save.type = "button";
 			save.addEventListener("click", async () => {
@@ -1454,12 +1623,12 @@ function renderAssignmentRow(submission, context) {
 				save.textContent = "Saving…";
 				try {
 					await gradingCall("grade_assignment_submission", {
-						submission: submission.name,
+						submission: submission.id,
 						status: status.value,
 						comments: comments.value,
 						attributed_to: attribution?.selectElement.value || null,
 					});
-					row.remove();
+					markGradingRowSaved(row);
 				} catch (error) {
 					alert(error.message);
 					save.disabled = false;
@@ -1472,14 +1641,10 @@ function renderAssignmentRow(submission, context) {
 			if (attribution) controls.append(attribution);
 			controls.append(actions);
 
-			const detail = createSubmissionDetail(
-				submission.question,
-				submission.answer,
-				controls
-			);
-			if (submission.assignment_attachment) {
+			const detail = createSubmissionDetail(submission.prompt, submission.answer, controls);
+			if (submission.attachment) {
 				const link = createTextElement("a", "Open submitted file", "biqat-grading-attachment");
-				link.href = submission.assignment_attachment;
+				link.href = submission.attachment;
 				link.target = "_blank";
 				link.rel = "noopener";
 				detail.insertBefore(link, detail.lastChild);
@@ -1492,10 +1657,11 @@ function renderAssignmentRow(submission, context) {
 
 function renderQuizAnswerRow(answer, context) {
 	const row = createGradingRow({
-		title: answer.quiz_title,
-		learner: answer.member_name || answer.member,
+		title: answer.title,
+		learner: answer.learner,
 		course: answer.course_title,
-		submitted: answer.creation,
+		submitted: answer.submitted,
+		badges: gradedBadges(answer),
 		buildDetail: () => {
 			const controls = document.createElement("div");
 			controls.className = "biqat-grading-controls";
@@ -1503,15 +1669,16 @@ function renderQuizAnswerRow(answer, context) {
 			const feedback = document.createElement("textarea");
 			feedback.rows = 2;
 			feedback.placeholder = "Feedback for the learner (optional)";
+			feedback.value = stripHtml(answer.feedback);
 
-			const attribution = createAttributionSelect(context);
+			const attribution = createAttributionSelect(context, answer.attributed_instructor);
 			const actions = document.createElement("div");
 			actions.className = "biqat-grading-actions";
 			const marks = document.createElement("input");
 			marks.type = "number";
 			marks.min = "0";
 			marks.max = String(answer.marks_out_of || 0);
-			marks.value = "0";
+			marks.value = String(answer.marks || 0);
 			marks.setAttribute("aria-label", "Marks");
 			const outOf = createTextElement(
 				"span",
@@ -1525,12 +1692,12 @@ function renderQuizAnswerRow(answer, context) {
 				save.textContent = "Saving…";
 				try {
 					await gradingCall("grade_quiz_answer", {
-						quiz_result: answer.quiz_result,
+						quiz_result: answer.id,
 						marks: marks.value,
 						feedback: feedback.value,
 						attributed_to: attribution?.selectElement.value || null,
 					});
-					row.remove();
+					markGradingRowSaved(row);
 				} catch (error) {
 					alert(error.message);
 					save.disabled = false;
@@ -1543,10 +1710,31 @@ function renderQuizAnswerRow(answer, context) {
 			if (attribution) controls.append(attribution);
 			controls.append(actions);
 
-			return createSubmissionDetail(answer.question, answer.answer, controls);
+			return createSubmissionDetail(answer.question || answer.prompt, answer.answer, controls);
 		},
 	});
 	return row;
+}
+
+function stripHtml(value) {
+	if (!value) return "";
+	const holder = document.createElement("div");
+	holder.innerHTML = value;
+	return holder.textContent.trim();
+}
+
+/**
+ * Keep the row in place after saving rather than removing it: the grader can
+ * see the result landed, and a mistaken grade stays visible to correct.
+ */
+function markGradingRowSaved(row) {
+	row.dataset.saved = "true";
+	const meta = row.querySelector(".biqat-grading-meta");
+	if (meta) meta.textContent = `Saved · ${meta.textContent}`;
+	const detail = row.querySelector(".biqat-grading-detail");
+	if (detail) detail.hidden = true;
+	row.dataset.open = "false";
+	row.querySelector(".biqat-grading-summary")?.setAttribute("aria-expanded", "false");
 }
 
 // Ordered by how naturally "Grading" sits after each entry.

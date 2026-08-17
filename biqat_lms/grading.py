@@ -33,7 +33,9 @@ INSTRUCTOR_PROFILE = "Biqat Instructor Profile"
 OPEN_ENDED = "Open Ended"
 ASSIGNMENT_STATUSES = {"Pass", "Fail", "Not Graded", "Not Applicable"}
 UNGRADED = "Not Graded"
-MAX_PENDING_ROWS = 200
+PENDING = "pending"
+GRADED = "graded"
+MAX_PENDING_ROWS = 500
 
 
 # ---------------------------------------------------------------------------
@@ -159,27 +161,144 @@ def get_grading_context():
 
 
 @frappe.whitelist()
-def list_pending_gradings():
-	"""Assignment submissions and open-ended quiz answers awaiting review."""
+def get_grading_filters():
+	"""Courses and instructors the signed-in grader can filter by."""
+	grader = resolve_grader()
+	courses = _scoped_courses(grader)
+
+	course_filters = {}
+	if courses is not None:
+		if not courses:
+			return {"courses": [], "instructors": []}
+		course_filters["name"] = ["in", courses]
+
+	options = {
+		"courses": frappe.get_all(
+			"LMS Course",
+			filters=course_filters,
+			fields=["name", "title"],
+			order_by="title asc",
+			limit_page_length=500,
+		),
+		"instructors": [],
+	}
+	if grader.kind == "staff":
+		options["instructors"] = frappe.get_all(
+			INSTRUCTOR_PROFILE,
+			filters={"enabled": 1},
+			fields=["name", "full_name"],
+			order_by="full_name asc",
+			limit_page_length=200,
+		)
+	return options
+
+
+@frappe.whitelist()
+def get_pending_count():
+	"""Total items awaiting review, for the sidebar badge."""
 	grader = resolve_grader()
 	courses = _scoped_courses(grader)
 	if courses is not None and not courses:
-		return {"assignments": [], "quiz_answers": []}
+		return {"count": 0}
+
+	rows = _assignment_rows(courses, PENDING, None) + _quiz_rows(courses, PENDING, None)
+	return {"count": len(rows)}
+
+
+@frappe.whitelist()
+def list_gradings(
+	course: str | None = None,
+	instructor: str | None = None,
+	status: str = PENDING,
+	kind: str | None = None,
+	search: str | None = None,
+	start: int | str = 0,
+	page_length: int | str = 20,
+):
+	"""One page of assignment submissions and open-ended quiz answers.
+
+	Both kinds are merged into a single list ordered oldest-first so the queue
+	is worked in the order learners submitted, and so paging behaves sensibly
+	across the two sources. Each source is capped at `MAX_PENDING_ROWS` before
+	merging; the cap is high enough for a realistic backlog and keeps the query
+	simple, and the reported total says when it has been reached.
+	"""
+	grader = resolve_grader()
+	if status not in {PENDING, GRADED, "all"}:
+		frappe.throw(_("Invalid status filter."), frappe.ValidationError)
+
+	courses = _visible_courses(grader, course, instructor)
+	if courses is not None and not courses:
+		return {"rows": [], "total": 0, "has_more": False}
+
+	rows = []
+	if kind in (None, "", "assignment"):
+		rows.extend(_assignment_rows(courses, status, search))
+	if kind in (None, "", "quiz"):
+		rows.extend(_quiz_rows(courses, status, search))
+
+	rows.sort(key=lambda row: str(row.get("submitted") or ""))
+	total = len(rows)
+	start = max(cint(start), 0)
+	page_length = cint(page_length) or 20
 
 	return {
-		"assignments": _pending_assignments(courses),
-		"quiz_answers": _pending_quiz_answers(courses),
+		"rows": rows[start : start + page_length],
+		"total": total,
+		"has_more": start + page_length < total,
 	}
 
 
-def _pending_assignments(courses: list[str] | None) -> list[dict]:
-	filters = {"status": UNGRADED}
+def _visible_courses(grader, course: str | None, instructor: str | None) -> list[str] | None:
+	"""Intersect the grader's own scope with any course/instructor filter."""
+	selections = []
+	scoped = _scoped_courses(grader)
+	if scoped is not None:
+		selections.append(scoped)
+	if instructor:
+		selections.append(_courses_for_profile(instructor))
+	if course:
+		selections.append([course])
+
+	if not selections:
+		return None
+
+	allowed = set(selections[0])
+	for selection in selections[1:]:
+		allowed &= set(selection)
+	return sorted(allowed)
+
+
+def _courses_for_profile(profile: str) -> list[str]:
+	return frappe.get_all(
+		"Biqat Instructor Course",
+		filters={"parent": profile, "parenttype": INSTRUCTOR_PROFILE, "parentfield": "courses"},
+		pluck="course",
+	)
+
+
+def _assignment_rows(courses: list[str] | None, status: str, search: str | None) -> list[dict]:
+	filters = {}
+	if status == PENDING:
+		filters["status"] = UNGRADED
+	elif status == GRADED:
+		filters["status"] = ["!=", UNGRADED]
 	if courses is not None:
 		filters["course"] = ["in", courses]
+
+	or_filters = None
+	if search:
+		term = f"%{search.strip()}%"
+		or_filters = {
+			"member_name": ["like", term],
+			"member": ["like", term],
+			"assignment_title": ["like", term],
+		}
 
 	rows = frappe.get_all(
 		ASSIGNMENT_SUBMISSION,
 		filters=filters,
+		or_filters=or_filters,
 		fields=[
 			"name",
 			"assignment",
@@ -191,39 +310,63 @@ def _pending_assignments(courses: list[str] | None) -> list[dict]:
 			"answer",
 			"type",
 			"assignment_attachment",
+			"status",
+			"comments",
+			"biqat_attributed_instructor",
 			"creation",
 		],
 		order_by="creation asc",
 		limit_page_length=MAX_PENDING_ROWS,
 	)
 	_attach_course_titles(rows)
-	return rows
+	_attach_instructor_names(rows)
+
+	return [
+		{
+			"kind": "assignment",
+			"id": row.name,
+			"title": row.assignment_title,
+			"learner": row.member_name or row.member,
+			"course": row.course,
+			"course_title": row.course_title,
+			"submitted": row.creation,
+			"status": row.status,
+			"prompt": row.question,
+			"answer": row.answer,
+			"attachment": row.assignment_attachment,
+			"feedback": row.comments,
+			"attributed_instructor": row.biqat_attributed_instructor,
+			"attributed_instructor_name": row.attributed_instructor_name,
+		}
+		for row in rows
+	]
 
 
-def _attach_course_titles(rows: list) -> None:
-	"""Resolve course titles in one query so the queue can group by course."""
-	names = list({row.get("course") for row in rows if row.get("course")})
-	if not names:
-		return
-	titles = dict(
-		frappe.get_all(
-			"LMS Course", filters={"name": ["in", names]}, fields=["name", "title"], as_list=True
-		)
-	)
-	for row in rows:
-		row["course_title"] = titles.get(row.get("course")) or row.get("course")
-
-
-def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
+def _quiz_rows(courses: list[str] | None, status: str, search: str | None) -> list[dict]:
 	conditions = ""
-	values: list = [OPEN_ENDED]
+	values: list = [QUIZ_SUBMISSION, OPEN_ENDED]
+
+	if status == PENDING:
+		conditions += " AND IFNULL(result.biqat_graded, 0) = 0"
+	elif status == GRADED:
+		conditions += " AND IFNULL(result.biqat_graded, 0) = 1"
+
 	if courses is not None:
 		placeholders = ", ".join(["%s"] * len(courses))
-		conditions = f"AND submission.course IN ({placeholders})"
+		conditions += f" AND submission.course IN ({placeholders})"
 		values.extend(courses)
+
+	if search:
+		term = f"%{search.strip()}%"
+		conditions += (
+			" AND (submission.member_name LIKE %s OR submission.member LIKE %s"
+			" OR submission.quiz_title LIKE %s)"
+		)
+		values.extend([term, term, term])
+
 	values.append(MAX_PENDING_ROWS)
 
-	return frappe.db.sql(
+	rows = frappe.db.sql(
 		f"""
 			SELECT
 				result.name AS quiz_result,
@@ -231,8 +374,9 @@ def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
 				result.answer,
 				result.marks,
 				result.marks_out_of,
-				submission.name AS submission,
-				submission.quiz,
+				result.biqat_graded,
+				result.biqat_feedback,
+				result.biqat_attributed_instructor,
 				submission.quiz_title,
 				submission.course,
 				COALESCE(course.title, submission.course) AS course_title,
@@ -249,14 +393,68 @@ def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
 			WHERE result.parenttype = %s
 				AND result.parentfield = 'result'
 				AND question.type = %s
-				AND IFNULL(result.biqat_graded, 0) = 0
 				{conditions}
 			ORDER BY submission.creation ASC
 			LIMIT %s
 		""",
-		tuple([QUIZ_SUBMISSION] + values),
+		tuple(values),
 		as_dict=True,
 	)
+	_attach_instructor_names(rows)
+
+	return [
+		{
+			"kind": "quiz",
+			"id": row.quiz_result,
+			"title": row.quiz_title,
+			"learner": row.member_name or row.member,
+			"course": row.course,
+			"course_title": row.course_title,
+			"submitted": row.creation,
+			"status": _("Graded") if row.biqat_graded else UNGRADED,
+			"prompt": row.question,
+			"answer": row.answer,
+			"marks": row.marks,
+			"marks_out_of": row.marks_out_of,
+			"feedback": row.biqat_feedback,
+			"attributed_instructor": row.biqat_attributed_instructor,
+			"attributed_instructor_name": row.attributed_instructor_name,
+		}
+		for row in rows
+	]
+
+
+def _attach_course_titles(rows: list) -> None:
+	"""Resolve course titles in one query so the queue can group by course."""
+	names = list({row.get("course") for row in rows if row.get("course")})
+	if not names:
+		return
+	titles = dict(
+		frappe.get_all(
+			"LMS Course", filters={"name": ["in", names]}, fields=["name", "title"], as_list=True
+		)
+	)
+	for row in rows:
+		row["course_title"] = titles.get(row.get("course")) or row.get("course")
+
+
+def _attach_instructor_names(rows: list) -> None:
+	"""Show who a graded item is credited to without a per-row lookup."""
+	names = list({row.get("biqat_attributed_instructor") for row in rows if row.get("biqat_attributed_instructor")})
+	titles = (
+		dict(
+			frappe.get_all(
+				INSTRUCTOR_PROFILE,
+				filters={"name": ["in", names]},
+				fields=["name", "full_name"],
+				as_list=True,
+			)
+		)
+		if names
+		else {}
+	)
+	for row in rows:
+		row["attributed_instructor_name"] = titles.get(row.get("biqat_attributed_instructor"))
 
 
 # ---------------------------------------------------------------------------
