@@ -31,6 +31,7 @@ const SIDEBAR_TRANSLATIONS = Object.freeze({
 	Quizzes: "ፈተናዎች",
 	Assignments: "የቤት ሥራዎች",
 	"Programming Exercises": "የፕሮግራም ልምምዶች",
+	Grading: "ምዘና",
 	More: "ተጨማሪ",
 });
 
@@ -347,23 +348,36 @@ function installUiStyles() {
 		.biqat-live-class-details { min-width: 0; flex: 1; }
 		.biqat-live-class-details strong { display: block; color: var(--ink-gray-9, #111827); }
 
-		.biqat-sidebar-grading {
-			display: block; width: calc(100% - 1rem); margin: 0.25rem 0.5rem;
-			padding: 0.375rem 0.5rem; border-radius: 0.5rem; text-align: left;
-			font-size: 0.8125rem; color: var(--ink-gray-7, #374151);
-			background: var(--surface-gray-2, #f3f4f6);
-		}
-		.biqat-sidebar-grading:hover { background: var(--surface-gray-3, #e5e7eb); }
 		.biqat-grading-section {
 			margin: 1.25rem 0 0.5rem; font-size: 0.8125rem; font-weight: 600;
 			text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-gray-5, #6b7280);
 		}
 		.biqat-grading-row {
 			border: 1px solid var(--outline-gray-1, #e5e7eb); border-radius: 0.5rem;
-			padding: 0.875rem; margin-bottom: 0.75rem;
+			margin-bottom: 0.5rem; overflow: hidden;
 		}
-		.biqat-grading-heading { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.5rem; }
-		.biqat-grading-prompt { font-size: 0.8125rem; color: var(--ink-gray-6, #4b5563); margin-bottom: 0.5rem; }
+		.biqat-grading-row[data-open="true"] { border-color: var(--outline-gray-3, #9ca3af); }
+		.biqat-grading-summary {
+			display: flex; align-items: center; gap: 1rem; width: 100%;
+			padding: 0.75rem 0.875rem; text-align: start; background: none;
+		}
+		.biqat-grading-summary:hover { background: var(--surface-gray-1, #f9fafb); }
+		.biqat-grading-row[data-open="true"] .lucide-chevron-down { transform: rotate(180deg); }
+		.biqat-grading-heading { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; flex: 1; }
+		.biqat-grading-title {
+			color: var(--ink-gray-9, #111827); overflow: hidden;
+			text-overflow: ellipsis; white-space: nowrap;
+		}
+		.biqat-grading-meta { font-size: 0.75rem; color: var(--ink-gray-5, #6b7280); }
+		.biqat-grading-detail {
+			padding: 0 0.875rem 0.875rem;
+			border-top: 1px solid var(--outline-gray-1, #e5e7eb);
+		}
+		.biqat-grading-attachment { display: inline-block; margin-bottom: 0.75rem; font-size: 0.875rem; text-decoration: underline; }
+		.biqat-grading-prompt {
+			font-size: 0.8125rem; color: var(--ink-gray-6, #4b5563);
+			margin: 0.75rem 0 0.5rem; max-height: 9rem; overflow-y: auto;
+		}
 		.biqat-grading-answer {
 			background: var(--surface-gray-1, #f9fafb); border-radius: 0.375rem;
 			padding: 0.625rem; font-size: 0.875rem; margin-bottom: 0.75rem;
@@ -1280,27 +1294,72 @@ function createAttributionSelect(context) {
 	return wrapper;
 }
 
-function createGradingRow({ title, learner, prompt, answer, controls }) {
+function formatSubmittedOn(value) {
+	if (!value) return "";
+	const date = new Date(value.replace(" ", "T"));
+	return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString();
+}
+
+/**
+ * A queue of a hundred submissions is unreadable if every prompt and answer is
+ * expanded, so each row collapses to title/learner/course/date and builds its
+ * detail only when opened.
+ */
+function createGradingRow({ title, learner, course, submitted, buildDetail }) {
 	const row = document.createElement("article");
 	row.className = "biqat-grading-row";
+
+	const summary = document.createElement("button");
+	summary.type = "button";
+	summary.className = "biqat-grading-summary";
+	summary.setAttribute("aria-expanded", "false");
+
 	const heading = document.createElement("div");
 	heading.className = "biqat-grading-heading";
 	heading.append(
-		createTextElement("strong", title || "Untitled"),
-		createTextElement("span", learner || "", "text-xs text-ink-gray-5")
+		createTextElement("strong", title || "Untitled", "biqat-grading-title"),
+		createTextElement(
+			"span",
+			[learner, course, formatSubmittedOn(submitted)].filter(Boolean).join(" · "),
+			"biqat-grading-meta"
+		)
 	);
-	row.append(heading);
+	const chevron = document.createElement("span");
+	chevron.className = "lucide-chevron-down size-4 shrink-0 text-ink-gray-5";
+	summary.append(heading, chevron);
+
+	const detail = document.createElement("div");
+	detail.className = "biqat-grading-detail";
+	detail.hidden = true;
+
+	summary.addEventListener("click", () => {
+		const open = detail.hidden;
+		if (open && !detail.dataset.built) {
+			detail.append(buildDetail());
+			detail.dataset.built = "true";
+		}
+		detail.hidden = !open;
+		summary.setAttribute("aria-expanded", open ? "true" : "false");
+		row.dataset.open = open ? "true" : "false";
+	});
+
+	row.append(summary, detail);
+	return row;
+}
+
+function createSubmissionDetail(prompt, answer, controls) {
+	const fragment = document.createDocumentFragment();
 	if (prompt) {
 		const promptBlock = document.createElement("div");
 		promptBlock.className = "biqat-grading-prompt";
 		promptBlock.innerHTML = prompt;
-		row.append(promptBlock);
+		fragment.append(promptBlock);
 	}
 	const answerBlock = document.createElement("div");
 	answerBlock.className = "biqat-grading-answer";
 	answerBlock.innerHTML = answer || "<em>No answer submitted.</em>";
-	row.append(answerBlock, controls);
-	return row;
+	fragment.append(answerBlock, controls);
+	return fragment;
 }
 
 function renderGradingPanel(shell, pending, context) {
@@ -1357,126 +1416,193 @@ function createNotificationToggle(context) {
 }
 
 function renderAssignmentRow(submission, context) {
-	const controls = document.createElement("div");
-	controls.className = "biqat-grading-controls";
-
-	const comments = document.createElement("textarea");
-	comments.rows = 2;
-	comments.placeholder = "Feedback for the learner (optional)";
-
-	const attribution = createAttributionSelect(context);
-	const actions = document.createElement("div");
-	actions.className = "biqat-grading-actions";
-	const status = document.createElement("select");
-	for (const value of ["Pass", "Fail", "Not Applicable"]) {
-		const option = document.createElement("option");
-		option.value = value;
-		option.textContent = value;
-		status.append(option);
-	}
-	const save = createTextElement("button", "Save grade", "biqat-button biqat-button-solid");
-	save.type = "button";
-	save.addEventListener("click", async () => {
-		save.disabled = true;
-		save.textContent = "Saving…";
-		try {
-			await gradingCall("grade_assignment_submission", {
-				submission: submission.name,
-				status: status.value,
-				comments: comments.value,
-				attributed_to: attribution?.selectElement.value || null,
-			});
-			row.remove();
-		} catch (error) {
-			alert(error.message);
-			save.disabled = false;
-			save.textContent = "Save grade";
-		}
-	});
-
-	actions.append(status, save);
-	controls.append(comments);
-	if (attribution) controls.append(attribution);
-	controls.append(actions);
-
 	const row = createGradingRow({
 		title: submission.assignment_title,
 		learner: submission.member_name || submission.member,
-		prompt: submission.question,
-		answer: submission.answer,
-		controls,
+		course: submission.course_title,
+		submitted: submission.creation,
+		buildDetail: () => {
+			const controls = document.createElement("div");
+			controls.className = "biqat-grading-controls";
+
+			const comments = document.createElement("textarea");
+			comments.rows = 2;
+			comments.placeholder = "Feedback for the learner (optional)";
+
+			const attribution = createAttributionSelect(context);
+			const actions = document.createElement("div");
+			actions.className = "biqat-grading-actions";
+			const status = document.createElement("select");
+			for (const value of ["Pass", "Fail", "Not Applicable"]) {
+				const option = document.createElement("option");
+				option.value = value;
+				option.textContent = value;
+				status.append(option);
+			}
+			const save = createTextElement("button", "Save grade", "biqat-button biqat-button-solid");
+			save.type = "button";
+			save.addEventListener("click", async () => {
+				save.disabled = true;
+				save.textContent = "Saving…";
+				try {
+					await gradingCall("grade_assignment_submission", {
+						submission: submission.name,
+						status: status.value,
+						comments: comments.value,
+						attributed_to: attribution?.selectElement.value || null,
+					});
+					row.remove();
+				} catch (error) {
+					alert(error.message);
+					save.disabled = false;
+					save.textContent = "Save grade";
+				}
+			});
+
+			actions.append(status, save);
+			controls.append(comments);
+			if (attribution) controls.append(attribution);
+			controls.append(actions);
+
+			const detail = createSubmissionDetail(
+				submission.question,
+				submission.answer,
+				controls
+			);
+			if (submission.assignment_attachment) {
+				const link = createTextElement("a", "Open submitted file", "biqat-grading-attachment");
+				link.href = submission.assignment_attachment;
+				link.target = "_blank";
+				link.rel = "noopener";
+				detail.insertBefore(link, detail.lastChild);
+			}
+			return detail;
+		},
 	});
 	return row;
 }
 
 function renderQuizAnswerRow(answer, context) {
-	const controls = document.createElement("div");
-	controls.className = "biqat-grading-controls";
-
-	const feedback = document.createElement("textarea");
-	feedback.rows = 2;
-	feedback.placeholder = "Feedback for the learner (optional)";
-
-	const attribution = createAttributionSelect(context);
-	const actions = document.createElement("div");
-	actions.className = "biqat-grading-actions";
-	const marks = document.createElement("input");
-	marks.type = "number";
-	marks.min = "0";
-	marks.max = String(answer.marks_out_of || 0);
-	marks.value = "0";
-	marks.setAttribute("aria-label", "Marks");
-	const outOf = createTextElement("span", `/ ${answer.marks_out_of || 0}`, "text-xs text-ink-gray-5");
-	const save = createTextElement("button", "Save marks", "biqat-button biqat-button-solid");
-	save.type = "button";
-	save.addEventListener("click", async () => {
-		save.disabled = true;
-		save.textContent = "Saving…";
-		try {
-			await gradingCall("grade_quiz_answer", {
-				quiz_result: answer.quiz_result,
-				marks: marks.value,
-				feedback: feedback.value,
-				attributed_to: attribution?.selectElement.value || null,
-			});
-			row.remove();
-		} catch (error) {
-			alert(error.message);
-			save.disabled = false;
-			save.textContent = "Save marks";
-		}
-	});
-
-	actions.append(marks, outOf, save);
-	controls.append(feedback);
-	if (attribution) controls.append(attribution);
-	controls.append(actions);
-
 	const row = createGradingRow({
 		title: answer.quiz_title,
 		learner: answer.member_name || answer.member,
-		prompt: answer.question,
-		answer: answer.answer,
-		controls,
+		course: answer.course_title,
+		submitted: answer.creation,
+		buildDetail: () => {
+			const controls = document.createElement("div");
+			controls.className = "biqat-grading-controls";
+
+			const feedback = document.createElement("textarea");
+			feedback.rows = 2;
+			feedback.placeholder = "Feedback for the learner (optional)";
+
+			const attribution = createAttributionSelect(context);
+			const actions = document.createElement("div");
+			actions.className = "biqat-grading-actions";
+			const marks = document.createElement("input");
+			marks.type = "number";
+			marks.min = "0";
+			marks.max = String(answer.marks_out_of || 0);
+			marks.value = "0";
+			marks.setAttribute("aria-label", "Marks");
+			const outOf = createTextElement(
+				"span",
+				`/ ${answer.marks_out_of || 0}`,
+				"text-xs text-ink-gray-5"
+			);
+			const save = createTextElement("button", "Save marks", "biqat-button biqat-button-solid");
+			save.type = "button";
+			save.addEventListener("click", async () => {
+				save.disabled = true;
+				save.textContent = "Saving…";
+				try {
+					await gradingCall("grade_quiz_answer", {
+						quiz_result: answer.quiz_result,
+						marks: marks.value,
+						feedback: feedback.value,
+						attributed_to: attribution?.selectElement.value || null,
+					});
+					row.remove();
+				} catch (error) {
+					alert(error.message);
+					save.disabled = false;
+					save.textContent = "Save marks";
+				}
+			});
+
+			actions.append(marks, outOf, save);
+			controls.append(feedback);
+			if (attribution) controls.append(attribution);
+			controls.append(actions);
+
+			return createSubmissionDetail(answer.question, answer.answer, controls);
+		},
 	});
 	return row;
+}
+
+function sidebarNavItemLabel(item) {
+	for (const span of item.querySelectorAll("span")) {
+		if (span.children.length) continue;
+		const text = span.textContent.trim();
+		if (text) return span;
+	}
+	return null;
+}
+
+function findSidebarNavItems(sidebar) {
+	const items = [];
+	for (const icon of sidebar.querySelectorAll('[class*="lucide-"]')) {
+		const item = icon.closest("a, button");
+		if (!item || item.id === GRADING_BUTTON_ID) continue;
+		if (item.closest(`#${SIDEBAR_LANGUAGE_SELECTOR_ID}`)) continue;
+		if (!items.includes(item) && sidebarNavItemLabel(item)) items.push(item);
+	}
+	return items;
 }
 
 async function ensureGradingSidebarButton(sidebar) {
 	if (document.getElementById(GRADING_BUTTON_ID)) return;
 	const context = await resolveGradingContext();
 	if (!context) return;
+	if (document.getElementById(GRADING_BUTTON_ID)) return;
 
+	// Clone a real nav item so the entry inherits the upstream sidebar's
+	// spacing, hover, active and theme styling instead of redefining it.
+	const items = findSidebarNavItems(sidebar);
+	if (!items.length) return;
+
+	const assessmentLabels = new Set(["Assignments", "Quizzes"]);
 	const anchor =
-		document.getElementById(SIDEBAR_LANGUAGE_SELECTOR_ID) ||
-		sidebar.querySelector(":scope > .flex.flex-col.overflow-y-auto")?.firstElementChild;
-	if (!anchor || document.getElementById(GRADING_BUTTON_ID)) return;
+		items.find((item) => {
+			const label = sidebarNavItemLabel(item);
+			const text = label?.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE) || label?.textContent.trim();
+			return assessmentLabels.has(text);
+		}) || items[items.length - 1];
 
-	const button = createTextElement("button", "Grading", "biqat-sidebar-grading");
-	button.id = GRADING_BUTTON_ID;
-	button.type = "button";
-	button.addEventListener("click", openGradingPanel);
-	anchor.insertAdjacentElement("afterend", button);
+	const entry = anchor.cloneNode(true);
+	entry.id = GRADING_BUTTON_ID;
+	entry.removeAttribute("href");
+	entry.removeAttribute("to");
+	entry.classList.remove("router-link-active", "router-link-exact-active");
+
+	const icon = entry.querySelector('[class*="lucide-"]');
+	if (icon) icon.className = icon.className.replace(/lucide-[\w-]+/, "lucide-square-check-big");
+
+	const label = sidebarNavItemLabel(entry);
+	if (label) {
+		label.removeAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
+		label.textContent = sidebarLanguage === "am" ? SIDEBAR_TRANSLATIONS.Grading : "Grading";
+	}
+	// A cloned shortcut hint ("Ctrl K") would be wrong on this entry.
+	for (const kbd of entry.querySelectorAll("kbd")) kbd.remove();
+
+	entry.addEventListener("click", (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		openGradingPanel();
+	});
+	anchor.insertAdjacentElement("afterend", entry);
 }
 
 function getLabelText(label) {

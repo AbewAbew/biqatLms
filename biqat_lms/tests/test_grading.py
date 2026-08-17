@@ -189,6 +189,10 @@ class TestBiqatGrading(FrappeTestCase):
 		self.assertIn(mine.name, names)
 		self.assertNotIn(theirs.name, names)
 
+		# The collapsed queue row identifies the course without opening it.
+		row = next(row for row in pending["assignments"] if row["name"] == mine.name)
+		self.assertEqual(row["course_title"], self.course.title)
+
 	def test_open_ended_answers_appear_in_the_queue(self):
 		submission = self._create_open_ended_quiz_submission()
 
@@ -197,6 +201,7 @@ class TestBiqatGrading(FrappeTestCase):
 
 		self.assertEqual(len(pending["quiz_answers"]), 1)
 		self.assertEqual(pending["quiz_answers"][0].submission, submission.name)
+		self.assertEqual(pending["quiz_answers"][0].course_title, self.course.title)
 
 	# -- assignment grading ----------------------------------------------
 

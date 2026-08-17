@@ -177,7 +177,7 @@ def _pending_assignments(courses: list[str] | None) -> list[dict]:
 	if courses is not None:
 		filters["course"] = ["in", courses]
 
-	return frappe.get_all(
+	rows = frappe.get_all(
 		ASSIGNMENT_SUBMISSION,
 		filters=filters,
 		fields=[
@@ -196,6 +196,22 @@ def _pending_assignments(courses: list[str] | None) -> list[dict]:
 		order_by="creation asc",
 		limit_page_length=MAX_PENDING_ROWS,
 	)
+	_attach_course_titles(rows)
+	return rows
+
+
+def _attach_course_titles(rows: list) -> None:
+	"""Resolve course titles in one query so the queue can group by course."""
+	names = list({row.get("course") for row in rows if row.get("course")})
+	if not names:
+		return
+	titles = dict(
+		frappe.get_all(
+			"LMS Course", filters={"name": ["in", names]}, fields=["name", "title"], as_list=True
+		)
+	)
+	for row in rows:
+		row["course_title"] = titles.get(row.get("course")) or row.get("course")
 
 
 def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
@@ -219,6 +235,7 @@ def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
 				submission.quiz,
 				submission.quiz_title,
 				submission.course,
+				COALESCE(course.title, submission.course) AS course_title,
 				submission.member,
 				submission.member_name,
 				submission.creation
@@ -227,6 +244,8 @@ def _pending_quiz_answers(courses: list[str] | None) -> list[dict]:
 				ON submission.name = result.parent
 			INNER JOIN `tabLMS Question` AS question
 				ON question.name = result.question_name
+			LEFT JOIN `tabLMS Course` AS course
+				ON course.name = submission.course
 			WHERE result.parenttype = %s
 				AND result.parentfield = 'result'
 				AND question.type = %s
