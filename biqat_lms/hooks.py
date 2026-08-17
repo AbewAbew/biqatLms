@@ -182,6 +182,9 @@ doc_events = {
 # selected for the Biqat LMS administrator interface.
 override_whitelisted_methods = {
 	"frappe.client.get_list": "biqat_lms.api.get_list",
+	# The LMS bundle targets a newer Frappe than the pinned one; without this the
+	# missing endpoint logs a traceback in the console on every page load.
+	"frappe.utils.telemetry.pulse.client.boot_config": "biqat_lms.api.telemetry_boot_config",
 	"lms.lms.api.get_created_courses": "biqat_lms.api.get_created_courses",
 	"lms.lms.api.get_created_batches": "biqat_lms.api.get_created_batches",
 	"lms.lms.api.get_my_batches": "biqat_lms.api.get_my_batches",

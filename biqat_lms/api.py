@@ -611,6 +611,23 @@ def get_profile_details(username: str):
 
 
 @frappe.whitelist(allow_guest=True)
+def telemetry_boot_config():
+	"""Stand in for a telemetry endpoint the LMS bundle calls but this Frappe lacks.
+
+	Frappe Learning v2.60.1 ships a frontend built against a newer Frappe, and it
+	requests `frappe.utils.telemetry.pulse.client.boot_config`, which does not
+	exist in the pinned v15.118.0. Nothing breaks — the caller already falls back
+	to an empty object — but every page load logged a traceback to the browser
+	console, which buries real errors.
+
+	The endpoint reports usage telemetry to Frappe Cloud and means nothing on a
+	self-hosted VM, so returning the caller's own fallback is the whole fix.
+	Remove this once Frappe is upgraded past the release that defines it.
+	"""
+	return {}
+
+
+@frappe.whitelist(allow_guest=True)
 def get_expert_courses(username: str):
 	"""Published courses credited to a managed instructor, for their public profile.
 

@@ -7,7 +7,13 @@ from lms import __version__ as lms_version
 from packaging.version import Version
 
 import biqat_lms.hooks as biqat_hooks
-from biqat_lms.api import ALLOWED_PAYMENT_GATEWAY_SETTINGS, get_list, normalize_time_fields
+import frappe.utils.telemetry.pulse.client
+from biqat_lms.api import (
+	ALLOWED_PAYMENT_GATEWAY_SETTINGS,
+	get_list,
+	normalize_time_fields,
+	telemetry_boot_config,
+)
 from biqat_lms.overrides.lms_live_class import BiqatLMSLiveClass
 from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
@@ -127,6 +133,21 @@ class TestBiqatLMSSetup(FrappeTestCase):
 			"biqat_lms.overrides.lms_live_class.BiqatLMSLiveClass",
 		)
 		self.assertIsInstance(frappe.new_doc("LMS Live Class"), BiqatLMSLiveClass)
+
+	def test_missing_telemetry_endpoint_is_stubbed(self):
+		# The LMS frontend targets a newer Frappe; without the override this
+		# command raises and every page load logs a traceback in the console.
+		self.assertEqual(
+			biqat_hooks.override_whitelisted_methods[
+				"frappe.utils.telemetry.pulse.client.boot_config"
+			],
+			"biqat_lms.api.telemetry_boot_config",
+		)
+		self.assertFalse(
+			hasattr(frappe.utils.telemetry.pulse.client, "boot_config"),
+			"Frappe now defines boot_config; drop the biqat_lms stub.",
+		)
+		self.assertEqual(telemetry_boot_config(), {})
 
 	def test_home_live_class_apis_use_zero_padded_time_wrapper(self):
 		self.assertEqual(
