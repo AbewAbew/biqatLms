@@ -86,13 +86,17 @@ website_redirects = [{"source": "/me", "target": "/lms"}]
 # ------------
 
 # before_install = "biqat_lms.install.before_install"
-after_install = "biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults"
+after_install = [
+	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
+	"biqat_lms.setup.grading_fields.create_grading_custom_fields",
+]
 
 # Keep site-level defaults and derived Program counts correct after migrations.
 after_migrate = [
 	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
 	"biqat_lms.setup.programs.sync_program_member_counts",
 	"biqat_lms.setup.instructor_profiles.prune_orphaned_instructor_attributions",
+	"biqat_lms.setup.grading_fields.create_grading_custom_fields",
 ]
 
 # Uninstallation
@@ -165,6 +169,12 @@ doc_events = {
 	},
 	"LMS Settings": {
 		"validate": "biqat_lms.setup.payment_defaults.validate_payment_configuration",
+	},
+	"LMS Assignment Submission": {
+		"after_insert": "biqat_lms.grading.notify_instructor_of_assignment",
+	},
+	"LMS Quiz Submission": {
+		"after_insert": "biqat_lms.grading.notify_instructor_of_quiz",
 	},
 }
 

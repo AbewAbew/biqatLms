@@ -713,6 +713,68 @@ editor, if none is set), and correctly address the email to enrolled/enabled
 users rather than the internal editor. The setting itself is left alone —
 administrators still control it from LMS Settings exactly as before.
 
+### 12.7 Grading by managed instructors and staff
+
+Frappe Learning only lets `PRIVILEGED_ROLES` (Moderator, Course Creator, Batch
+Evaluator, System Manager) grade a submission, and those roles carry broad Desk
+access. A managed instructor is deliberately not a Frappe User with any role, so
+grading is exposed through `biqat_lms/grading.py` instead: a narrow whitelisted
+API that resolves the caller, scopes the work, and writes with
+`ignore_permissions` — the same pattern as the rest of this app.
+
+A managed instructor is recognised purely by their profile's private
+`contact_email` matching their login, so signing in with Google is all the
+provisioning required. They see only submissions for courses they are
+attributed to. Biqat staff see everything.
+
+Two upstream behaviours make `Document.save()` unusable for these writes, and
+both are reproduced explicitly instead:
+
+- `LMSAssignmentSubmission.enforce_grading_permission` reverts the grading
+  fields for any caller without a privileged role — which a managed instructor
+  never has — so a save would silently discard their grade.
+- `LMSQuizSubmission.validate_if_max_attempts_exceeded` counts existing
+  submissions *including the one being saved*, so re-saving a graded quiz throws
+  once the learner has used their attempts. `_recalculate_quiz_score()`
+  reproduces `validate_marks`/`set_percentage` without a document save.
+
+Both are covered by regression tests that assert the grade actually persists.
+
+#### Attribution
+
+Grading records two identities, mirroring the internal-editor/managed-instructor
+split used for courses, batches and certificates:
+
+- `biqat_graded_by` — the account that recorded the grade. Internal only.
+- `biqat_attributed_instructor` — the profile whose judgement it represents.
+  This is the name the learner sees.
+
+Staff may therefore record a grade on behalf of an expert who reviewed the work
+offline, which suits a non-technical instructor: the learner sees the expert's
+name and feedback either way, and the audit trail keeps the real account. The
+learner notification never falls back to the internal account name — it credits
+`"The {brand} team"` when no profile is attributed.
+
+#### Alerts
+
+`LMS Assignment Submission` and `LMS Quiz Submission` gain `after_insert` hooks
+(neither doctype had any hook upstream). Quiz alerts fire only when the quiz
+actually contains an `Open Ended` question, since a fully auto-graded quiz needs
+no human. Alerts are opt-in per profile via `notify_on_submission` (default off)
+so an instructor on a large cohort is not emailed on every submission; they can
+mute or unmute themselves from the grading panel.
+
+Custom fields on the upstream doctypes are created by
+`biqat_lms.setup.grading_fields` on install and migrate, prefixed `biqat_` so a
+future Frappe Learning release adding its own `graded`/`feedback` fields cannot
+collide.
+
+Note: the stock quiz-grading screens (`QuizSubmissionList.vue`,
+`QuizSubmission.vue`) show a marks field to instructors, but `LMS Quiz
+Submission` grants write permission to System Manager only, so that path likely
+fails for other staff. It is left untouched; the Biqat grading panel does not
+depend on it.
+
 ## 13. Programs and learner enrollment
 
 Programs and Batches are different concepts:

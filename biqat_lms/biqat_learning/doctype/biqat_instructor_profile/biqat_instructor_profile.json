@@ -10,6 +10,7 @@
   "full_name",
   "profile_slug",
   "enabled",
+  "notify_on_submission",
   "professional_title",
   "organization",
   "contact_email",
@@ -53,6 +54,13 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Email this instructor when a learner submits work that needs their review.",
+   "fieldname": "notify_on_submission",
+   "fieldtype": "Check",
+   "label": "Notify On New Submissions"
   },
   {
    "fieldname": "professional_title",
