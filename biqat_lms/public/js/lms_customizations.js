@@ -348,6 +348,14 @@ function installUiStyles() {
 		.biqat-live-class-details { min-width: 0; flex: 1; }
 		.biqat-live-class-details strong { display: block; color: var(--ink-gray-9, #111827); }
 
+		/* Only used if the sidebar markup changes shape and no nav entry can be cloned. */
+		.biqat-sidebar-grading {
+			display: block; width: calc(100% - 1rem); margin: 0.25rem 0.5rem;
+			padding: 0.375rem 0.5rem; border-radius: 0.5rem; text-align: start;
+			font-size: 0.875rem; color: var(--ink-gray-7, #374151);
+			background: var(--surface-gray-2, #f3f4f6);
+		}
+		.biqat-sidebar-grading:hover { background: var(--surface-gray-3, #e5e7eb); }
 		.biqat-grading-section {
 			margin: 1.25rem 0 0.5rem; font-size: 0.8125rem; font-weight: 600;
 			text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-gray-5, #6b7280);
@@ -1541,24 +1549,81 @@ function renderQuizAnswerRow(answer, context) {
 	return row;
 }
 
+// Ordered by how naturally "Grading" sits after each entry.
+const GRADING_ANCHOR_LABELS = [
+	"Assignments",
+	"Quizzes",
+	"Jobs",
+	"Certifications",
+	"Batches",
+	"Courses",
+	"Home",
+];
+
 function sidebarNavItemLabel(item) {
 	for (const span of item.querySelectorAll("span")) {
 		if (span.children.length) continue;
-		const text = span.textContent.trim();
-		if (text) return span;
+		if (span.textContent.trim()) return span;
 	}
 	return null;
 }
 
-function findSidebarNavItems(sidebar) {
-	const items = [];
-	for (const icon of sidebar.querySelectorAll('[class*="lucide-"]')) {
-		const item = icon.closest("a, button");
-		if (!item || item.id === GRADING_BUTTON_ID) continue;
-		if (item.closest(`#${SIDEBAR_LANGUAGE_SELECTOR_ID}`)) continue;
-		if (!items.includes(item) && sidebarNavItemLabel(item)) items.push(item);
+/**
+ * Locate a nav entry by its visible label rather than by icon markup: the
+ * sidebar renders icons as Lucide components, so their markup is not
+ * guaranteed to carry a matching class.
+ */
+function findSidebarNavEntry(sidebar) {
+	for (const wanted of GRADING_ANCHOR_LABELS) {
+		const accepted = new Set([wanted, SIDEBAR_TRANSLATIONS[wanted]].filter(Boolean));
+		for (const span of sidebar.querySelectorAll("span")) {
+			if (span.children.length) continue;
+			const text = (
+				span.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE) || span.textContent
+			).trim();
+			if (!accepted.has(text)) continue;
+
+			const entry = span.closest("a, button");
+			if (!entry || entry.id === GRADING_BUTTON_ID) continue;
+			if (entry.closest(`#${SIDEBAR_LANGUAGE_SELECTOR_ID}`)) continue;
+			return entry;
+		}
 	}
-	return items;
+	return null;
+}
+
+function setElementClass(element, value) {
+	// SVG elements expose `className` as a read-only SVGAnimatedString.
+	element.setAttribute("class", value);
+}
+
+function buildGradingEntry(anchor) {
+	if (!anchor) {
+		const fallback = createTextElement("button", "Grading", "biqat-sidebar-grading");
+		fallback.type = "button";
+		return fallback;
+	}
+
+	const entry = anchor.cloneNode(true);
+	entry.removeAttribute("href");
+	entry.removeAttribute("to");
+	entry.classList.remove("router-link-active", "router-link-exact-active");
+	entry.removeAttribute("aria-current");
+
+	const icon = entry.querySelector('[class*="lucide-"]');
+	const iconClass = icon?.getAttribute("class");
+	if (iconClass) {
+		setElementClass(icon, iconClass.replace(/lucide-[\w-]+/g, "lucide-square-check-big"));
+	}
+
+	const label = sidebarNavItemLabel(entry);
+	if (label) {
+		label.removeAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
+		label.textContent = sidebarLanguage === "am" ? SIDEBAR_TRANSLATIONS.Grading : "Grading";
+	}
+	// A cloned keyboard-shortcut hint would be wrong on this entry.
+	for (const kbd of entry.querySelectorAll("kbd")) kbd.remove();
+	return entry;
 }
 
 async function ensureGradingSidebarButton(sidebar) {
@@ -1567,42 +1632,26 @@ async function ensureGradingSidebarButton(sidebar) {
 	if (!context) return;
 	if (document.getElementById(GRADING_BUTTON_ID)) return;
 
-	// Clone a real nav item so the entry inherits the upstream sidebar's
-	// spacing, hover, active and theme styling instead of redefining it.
-	const items = findSidebarNavItems(sidebar);
-	if (!items.length) return;
-
-	const assessmentLabels = new Set(["Assignments", "Quizzes"]);
-	const anchor =
-		items.find((item) => {
-			const label = sidebarNavItemLabel(item);
-			const text = label?.getAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE) || label?.textContent.trim();
-			return assessmentLabels.has(text);
-		}) || items[items.length - 1];
-
-	const entry = anchor.cloneNode(true);
+	// Clone a real nav entry so it inherits the upstream sidebar's spacing,
+	// hover, active and theme styling. If the sidebar markup ever changes shape
+	// the entry still renders, just with local styling, rather than vanishing.
+	const anchor = findSidebarNavEntry(sidebar);
+	const entry = buildGradingEntry(anchor);
 	entry.id = GRADING_BUTTON_ID;
-	entry.removeAttribute("href");
-	entry.removeAttribute("to");
-	entry.classList.remove("router-link-active", "router-link-exact-active");
-
-	const icon = entry.querySelector('[class*="lucide-"]');
-	if (icon) icon.className = icon.className.replace(/lucide-[\w-]+/, "lucide-square-check-big");
-
-	const label = sidebarNavItemLabel(entry);
-	if (label) {
-		label.removeAttribute(SIDEBAR_SOURCE_LABEL_ATTRIBUTE);
-		label.textContent = sidebarLanguage === "am" ? SIDEBAR_TRANSLATIONS.Grading : "Grading";
-	}
-	// A cloned shortcut hint ("Ctrl K") would be wrong on this entry.
-	for (const kbd of entry.querySelectorAll("kbd")) kbd.remove();
-
 	entry.addEventListener("click", (event) => {
 		event.preventDefault();
 		event.stopPropagation();
 		openGradingPanel();
 	});
-	anchor.insertAdjacentElement("afterend", entry);
+
+	if (anchor) {
+		anchor.insertAdjacentElement("afterend", entry);
+		return;
+	}
+
+	const selector = document.getElementById(SIDEBAR_LANGUAGE_SELECTOR_ID);
+	if (selector) selector.insertAdjacentElement("afterend", entry);
+	else sidebar.querySelector(":scope > .flex.flex-col.overflow-y-auto")?.append(entry);
 }
 
 function getLabelText(label) {
