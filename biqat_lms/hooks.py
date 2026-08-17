@@ -59,8 +59,12 @@ required_apps = ["frappe/lms"]
 # Frappe OAuth sends website users to /me when no redirect was supplied.
 website_redirects = [{"source": "/me", "target": "/lms"}]
 
-# application home page (will override Website Settings)
-# home_page = "login"
+# The learning platform is the whole product, so the site root is the LMS rather
+# than a separate marketing page. frappe.website.utils.get_home_page consults
+# hooks before Website Settings and takes the last installed app's value, so this
+# wins over both the stock default and anything set in the Website Settings UI.
+# A Role or Portal Settings home page still takes precedence for signed-in users.
+home_page = "lms"
 
 # website user home page (by Role)
 # role_home_page = {

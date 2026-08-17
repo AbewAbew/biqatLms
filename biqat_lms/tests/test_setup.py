@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.website.utils import get_home_page_via_hooks
 from lms import __version__ as lms_version
 from packaging.version import Version
 
@@ -118,6 +119,13 @@ class TestBiqatLMSSetup(FrappeTestCase):
 
 	def test_default_website_profile_redirects_to_lms(self):
 		self.assertIn({"source": "/me", "target": "/lms"}, biqat_hooks.website_redirects)
+
+	def test_site_root_serves_the_lms(self):
+		# get_home_page consults hooks before Website Settings and takes the last
+		# installed app's value, so biqat_lms wins over lms and the stock default.
+		self.assertEqual(biqat_hooks.home_page, "lms")
+		self.assertEqual(frappe.get_hooks("home_page")[-1], "lms")
+		self.assertEqual(get_home_page_via_hooks(), "lms")
 
 	def test_google_meet_live_class_uses_biqat_timezone_wrapper(self):
 		self.assertEqual(
