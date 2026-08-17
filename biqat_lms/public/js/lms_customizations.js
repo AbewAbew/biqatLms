@@ -1767,39 +1767,42 @@ function currentExpertUsername() {
 	return match ? decodeURIComponent(match[1]) : null;
 }
 
-function findProfileTabGroup() {
+function findButtonByLabel(labels) {
 	for (const button of document.querySelectorAll("button")) {
-		if (button.textContent.trim() === "About" && button.parentElement) {
-			return button.parentElement;
-		}
+		if (labels.includes(button.textContent.trim())) return button;
 	}
 	return null;
 }
 
 /**
- * A managed instructor has no User account, so "Certificates" (none earned) and
- * "Roles" (a toggle list implying platform access they deliberately lack) say
- * nothing true about them. Hide both and show the courses they teach instead.
+ * The tab bar is the nearest ancestor containing every tab button; each button
+ * sits in its own wrapper, so a button's parent is not the bar.
  */
-function hideIrrelevantExpertTabs() {
-	const group = findProfileTabGroup();
-	if (!group) return;
-	for (const button of group.querySelectorAll("button")) {
-		const label = button.textContent.trim();
-		if (label === "Certificates" || label === "Roles") button.hidden = true;
+function findTabContainer(buttons) {
+	let node = buttons[0];
+	while (node) {
+		if (buttons.every((button) => node.contains(button))) return node;
+		node = node.parentElement;
 	}
+	return null;
+}
+
+function findProfilePanel(container) {
+	let node = container;
+	while (node) {
+		if (node.nextElementSibling) return node.nextElementSibling;
+		node = node.parentElement;
+	}
+	return null;
 }
 
 function renderExpertCourses(courses) {
 	const section = document.createElement("section");
 	section.id = EXPERT_COURSES_SECTION_ID;
 	section.className = "biqat-expert-courses";
-	section.append(createTextElement("h2", "Courses", "biqat-expert-courses-title"));
 
 	if (!courses.length) {
-		section.append(
-			createTextElement("p", "No published courses yet.", "biqat-muted")
-		);
+		section.append(createTextElement("p", "No published courses yet.", "biqat-muted"));
 		return section;
 	}
 
@@ -1839,28 +1842,44 @@ function getLmsBasePath() {
 	return match ? match[1] : "/lms";
 }
 
+/**
+ * A managed instructor has no User account, so the stock profile tabs describe
+ * nothing true about them: "Certificates" lists what a learner earned, and
+ * "Roles" toggles platform access they deliberately lack. Reuse the first slot
+ * for the courses they teach and drop the second.
+ */
 async function ensureExpertProfileSections() {
-	const username = currentExpertUsername();
-	if (!username) {
-		document.getElementById(EXPERT_COURSES_SECTION_ID)?.remove();
-		return;
-	}
+	if (!currentExpertUsername()) return;
 
-	hideIrrelevantExpertTabs();
+	const roles = findButtonByLabel(["Roles"]);
+	if (roles) roles.hidden = true;
+
+	const coursesTab = findButtonByLabel(["Certificates", "Courses"]);
+	const about = findButtonByLabel(["About"]);
+	if (!coursesTab) return;
+
+	const label = [...coursesTab.querySelectorAll("span")].find(
+		(span) => !span.children.length && span.textContent.trim() === "Certificates"
+	);
+	if (label) label.textContent = "Courses";
+	else if (coursesTab.textContent.trim() === "Certificates") coursesTab.textContent = "Courses";
+
+	// The certificates route is now the courses tab, so replace what it renders.
+	if (!/\/certificates\/?$/.test(window.location.pathname)) return;
 	if (document.getElementById(EXPERT_COURSES_SECTION_ID)) return;
 
-	const group = findProfileTabGroup();
-	const host = group?.parentElement;
-	if (!host) return;
+	const container = findTabContainer([about, coursesTab].filter(Boolean));
+	const panel = container && findProfilePanel(container);
+	if (!panel) return;
 
 	// Claim the slot before awaiting so repeated DOM updates cannot insert twice.
 	const placeholder = document.createElement("section");
 	placeholder.id = EXPERT_COURSES_SECTION_ID;
-	host.append(placeholder);
+	panel.replaceChildren(placeholder);
 
 	let courses = [];
 	try {
-		courses = (await apiCall("get_expert_courses", { username })) || [];
+		courses = (await apiCall("get_expert_courses", { username: currentExpertUsername() })) || [];
 	} catch {
 		placeholder.remove();
 		return;

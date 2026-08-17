@@ -722,10 +722,15 @@ is always empty and the second implies platform access they deliberately lack â€
 actively misleading on a public page.
 
 `biqat_lms.api.get_expert_courses()` returns the published courses credited to
-the profile, and the customization script hides both tabs on `/user/expert-*`
-routes and appends a course list instead. The endpoint allows guests, since
-instructor profiles are public, and filters out unpublished courses and
-disabled profiles.
+the profile. On `/user/expert-*` routes the customization script hides the
+Roles tab, relabels Certificates to **Courses**, and replaces what that route
+renders with the course list. The endpoint allows guests, since instructor
+profiles are public, and filters out unpublished courses and disabled
+profiles.
+
+The tab bar is located by finding the nearest ancestor containing every tab
+button: `TabButtons` wraps each button separately, so a button's parent is not
+the bar.
 
 ### 12.8 Grading by managed instructors and staff
 
