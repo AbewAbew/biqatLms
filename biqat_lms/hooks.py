@@ -196,6 +196,12 @@ override_whitelisted_methods = {
 	"lms.lms.api.get_admin_live_classes": "biqat_lms.api.get_admin_live_classes",
 	"lms.lms.api.get_my_live_classes": "biqat_lms.api.get_my_live_classes",
 	"lms.lms.api.get_profile_details": "biqat_lms.api.get_profile_details",
+	# Platform statistics are staff-only: upstream serves every one of these to
+	# guests with no role check, and the sidebar entry has no visibility rule.
+	"lms.lms.api.get_sidebar_settings": "biqat_lms.api.get_sidebar_settings",
+	"lms.lms.api.get_chart_details": "biqat_lms.api.get_chart_details",
+	"lms.lms.utils.get_chart_data": "biqat_lms.api.get_chart_data",
+	"lms.lms.utils.get_course_completion_data": "biqat_lms.api.get_course_completion_data",
 	"lms.lms.doctype.lms_batch.lms_batch.create_google_meet_live_class": "biqat_lms.api.create_google_meet_live_class",
 	"lms.lms.utils.get_course_details": "biqat_lms.api.get_course_details",
 	"lms.lms.utils.get_courses": "biqat_lms.api.get_courses",

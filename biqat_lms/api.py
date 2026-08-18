@@ -7,12 +7,14 @@ from frappe import _
 from frappe.client import get_list as frappe_get_list
 from frappe.utils import cint, escape_html
 from lms.lms.api import get_admin_live_classes as lms_get_admin_live_classes
+from lms.lms.api import get_chart_details as lms_get_chart_details
 from lms.lms.api import get_created_batches as lms_get_created_batches
 from lms.lms.api import get_created_courses as lms_get_created_courses
 from lms.lms.api import get_my_batches as lms_get_my_batches
 from lms.lms.api import get_my_courses as lms_get_my_courses
 from lms.lms.api import get_my_live_classes as lms_get_my_live_classes
 from lms.lms.api import get_profile_details as lms_get_profile_details
+from lms.lms.api import get_sidebar_settings as lms_get_sidebar_settings
 from lms.lms.doctype.lms_batch.lms_batch import (
 	create_google_meet_live_class as lms_create_google_meet_live_class,
 )
@@ -35,6 +37,12 @@ from lms.lms.utils import (
 )
 from lms.lms.utils import (
 	get_courses as lms_get_courses,
+)
+from lms.lms.utils import (
+	get_chart_data as lms_get_chart_data,
+)
+from lms.lms.utils import (
+	get_course_completion_data as lms_get_course_completion_data,
 )
 from lms.lms.utils import (
 	get_program_details as lms_get_program_details,
@@ -876,3 +884,75 @@ def _get_non_moderator_editor_courses(course_names: list[str]) -> set[str]:
 			pluck="parent",
 		)
 	)
+
+
+# ---------------------------------------------------------------------------
+# Platform statistics
+# ---------------------------------------------------------------------------
+
+# Signup, enrollment, completion and certification counts are internal business
+# figures, not public marketing copy. Upstream whitelists every statistics
+# endpoint with `allow_guest=True` and no role check, and the sidebar entry
+# carries no `condition`, so a signed-out visitor landing on the site root could
+# read them straight off /lms/statistics. `get_chart_data` is the worst of the
+# three: it loads any `Dashboard Chart` the caller names, so it leaks aggregates
+# from doctypes well beyond the LMS. Restrict all of it to Biqat staff.
+STATISTICS_ROLES = {"Moderator", "System Manager"}
+
+
+def can_view_statistics() -> bool:
+	if frappe.session.user == "Administrator":
+		return True
+	return bool(STATISTICS_ROLES & set(frappe.get_roles()))
+
+
+def _assert_can_view_statistics():
+	if not can_view_statistics():
+		frappe.throw(
+			_("You are not permitted to view platform statistics."), frappe.PermissionError
+		)
+
+
+@frappe.whitelist(allow_guest=True)
+def get_sidebar_settings():
+	"""Hide the Statistics link from everyone who cannot read the numbers.
+
+	The frontend drops a sidebar item whose label matches a falsy key here, so
+	zeroing `statistics` removes the entry without touching the pinned bundle.
+	The LMS Settings checkbox still wins for staff: this only ever turns the
+	entry off.
+	"""
+	settings = lms_get_sidebar_settings()
+	if can_view_statistics():
+		return settings
+
+	if not isinstance(settings, dict):
+		# Upstream answers `[]` when guest access is disabled, which filters
+		# nothing. Return the one key we care about instead.
+		return frappe._dict({"statistics": 0})
+
+	settings["statistics"] = 0
+	return settings
+
+
+@frappe.whitelist()
+def get_chart_details():
+	_assert_can_view_statistics()
+	return lms_get_chart_details()
+
+
+@frappe.whitelist()
+def get_chart_data(
+	chart_name: str,
+	timegrain: str = "Daily",
+	from_date: str = None,
+	to_date: str = None,
+):
+	_assert_can_view_statistics()
+	return lms_get_chart_data(chart_name, timegrain, from_date, to_date)
+
+
+@frappe.whitelist()
+def get_course_completion_data():
+	_assert_can_view_statistics()
+	return lms_get_course_completion_data()

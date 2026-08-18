@@ -11,7 +11,11 @@ import biqat_lms.hooks as biqat_hooks
 import frappe.utils.telemetry.pulse.client
 from biqat_lms.api import (
 	ALLOWED_PAYMENT_GATEWAY_SETTINGS,
+	get_chart_data,
+	get_chart_details,
+	get_course_completion_data,
 	get_list,
+	get_sidebar_settings,
 	normalize_time_fields,
 	telemetry_boot_config,
 )
@@ -126,6 +130,43 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		self.assertEqual(biqat_hooks.home_page, "lms")
 		self.assertEqual(frappe.get_hooks("home_page")[-1], "lms")
 		self.assertEqual(get_home_page_via_hooks(), "lms")
+
+	def test_statistics_endpoints_are_staff_only(self):
+		# Upstream whitelists all three with allow_guest=True and no role check,
+		# so the site root would hand platform figures to any visitor.
+		for cmd, override in (
+			("lms.lms.api.get_chart_details", "biqat_lms.api.get_chart_details"),
+			("lms.lms.utils.get_chart_data", "biqat_lms.api.get_chart_data"),
+			(
+				"lms.lms.utils.get_course_completion_data",
+				"biqat_lms.api.get_course_completion_data",
+			),
+			("lms.lms.api.get_sidebar_settings", "biqat_lms.api.get_sidebar_settings"),
+		):
+			self.assertEqual(biqat_hooks.override_whitelisted_methods[cmd], override)
+
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		with self.assertRaises(frappe.PermissionError):
+			get_chart_details()
+		with self.assertRaises(frappe.PermissionError):
+			get_chart_data("New Signups")
+		with self.assertRaises(frappe.PermissionError):
+			get_course_completion_data()
+
+	def test_statistics_sidebar_entry_is_hidden_from_non_staff(self):
+		frappe.db.set_single_value("LMS Settings", "allow_guest_access", 1)
+		frappe.db.set_single_value("LMS Settings", "statistics", 1)
+
+		self.assertEqual(get_sidebar_settings()["statistics"], 1)
+
+		frappe.set_user("Guest")
+		self.addCleanup(frappe.set_user, "Administrator")
+
+		# The frontend drops a sidebar item whose lower-cased label matches a
+		# falsy key, so this is what removes the entry.
+		self.assertEqual(get_sidebar_settings()["statistics"], 0)
 
 	def test_google_meet_live_class_uses_biqat_timezone_wrapper(self):
 		self.assertEqual(
