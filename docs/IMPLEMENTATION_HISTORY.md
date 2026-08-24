@@ -1,6 +1,6 @@
 # Biqat Learning Implementation and Operations Record
 
-Last updated: 16 August 2026
+Last updated: 24 August 2026
 
 This document records the Frappe Learning installation, infrastructure work,
 upgrades, customizations, production fixes, and operating procedures completed
@@ -587,6 +587,29 @@ The main browser logic is in:
 biqat_lms/public/js/lms_customizations.js
 ```
 
+### 11.5 Learner Home dashboard
+
+The stock learner Home remains owned by the pinned LMS app. Biqat adds a
+responsive dashboard above its course, batch, evaluation, and live-class
+sections through the existing page-renderer script, without editing the LMS
+Vue source.
+
+The dashboard displays only figures derived from the signed-in learner's real
+LMS records: active and completed enrollments, certificates, registered
+batches, course-completion percentage, and learning streak. It deliberately
+does not estimate CPD credit hours or claim regulatory compliance. Staff keep
+the stock instructor Home. If the optional API or the pinned Home markup is
+unavailable, the script removes its placeholder and leaves the stock page
+usable.
+
+Relevant source and tests:
+
+```text
+biqat_lms/home_dashboard.py
+biqat_lms/public/js/lms_customizations.js
+biqat_lms/tests/test_home_dashboard.py
+```
+
 ## 12. Managed instructor publishing
 
 Frappe Learning's stock course instructor is also a course-editing permission
@@ -913,6 +936,7 @@ change.
 | --- | --- |
 | `biqat_lms/hooks.py` | App hooks, API overrides, OAuth fallback redirect, migrations |
 | `biqat_lms/api.py` | Payment filtering, public instructor APIs, course/Program overrides, enrollment fix |
+| `biqat_lms/home_dashboard.py` | Permission-scoped learner Home aggregates |
 | `biqat_lms/branding.py` | Branding compatibility helpers |
 | `biqat_lms/page_renderers.py` | Injects the Biqat browser customization into the LMS shell |
 | `biqat_lms/public/js/lms_customizations.js` | Branding, UI removal, sidebar languages, instructor management and selectors |
@@ -924,6 +948,7 @@ change.
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_course/` | Instructor-to-course attribution child DocType |
 | `biqat_lms/biqat_learning/doctype/biqat_instructor_batch/` | Instructor-to-batch attribution child DocType |
 | `biqat_lms/tests/test_setup.py` | Installation, payment, rendering, and OAuth redirect tests |
+| `biqat_lms/tests/test_home_dashboard.py` | Learner aggregate, staff fallback, and guest-access tests |
 
 The upstream `apps/lms` checkout should remain pinned. Reusable changes belong
 in `apps/biqat_lms`, not as untracked production edits inside `apps/lms`.
@@ -970,6 +995,7 @@ The custom app currently has 27 automated tests covering, among other things:
 - Ethiopian site timezone configuration;
 - administrator Live Class deletion;
 - safe Google Calendar attendee email resolution.
+- learner Home aggregates, staff fallback, and guest access denial.
 
 Standard validation commands:
 

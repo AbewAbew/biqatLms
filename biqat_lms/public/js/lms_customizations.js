@@ -18,6 +18,8 @@ const GRADING_API_BASE = "/api/method/biqat_lms.grading";
 const GRADING_PANEL_ID = "biqat-grading-panel";
 const GRADING_BUTTON_ID = "biqat-grading-button";
 const EXPERT_COURSES_SECTION_ID = "biqat-expert-courses";
+const HOME_DASHBOARD_ID = "biqat-student-home-dashboard";
+const HOME_DASHBOARD_CACHE_MS = 60_000;
 const SIDEBAR_TRANSLATIONS = Object.freeze({
 	Home: "መነሻ",
 	Search: "ፍለጋ",
@@ -454,7 +456,64 @@ function installUiStyles() {
 			background: var(--surface-gray-1, #f9fafb);
 		}
 
-		@media (max-width: 640px) { .biqat-form-grid { grid-template-columns: 1fr; } }
+		.biqat-home-native-heading-hidden { display: none !important; }
+		#${HOME_DASHBOARD_ID} { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 2.5rem; animation: biqat-home-enter 260ms ease-out; }
+		.biqat-home-hero {
+			position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+			align-items: center; gap: 2rem; overflow: hidden; padding: 2rem;
+			border: 1px solid rgb(52 211 153 / 0.28); border-radius: 1rem;
+			background: linear-gradient(135deg, #022c22 0%, #064e3b 58%, #0f766e 100%);
+			box-shadow: 0 18px 40px rgb(6 78 59 / 0.2); color: #fff;
+		}
+		.biqat-home-hero::after { content: ""; position: absolute; width: 18rem; height: 18rem; inset-inline-end: -6rem; top: -8rem; border: 3rem solid rgb(251 191 36 / 0.08); border-radius: 999px; }
+		.biqat-home-hero-copy { position: relative; z-index: 1; max-width: 48rem; }
+		.biqat-home-eyebrow { display: inline-flex; align-items: center; gap: 0.45rem; margin-bottom: 0.9rem; padding: 0.3rem 0.65rem; border: 1px solid rgb(110 231 183 / 0.3); border-radius: 999px; background: rgb(2 44 34 / 0.55); color: #a7f3d0; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+		.biqat-home-eyebrow-dot { width: 0.45rem; height: 0.45rem; border-radius: 999px; background: #fbbf24; }
+		.biqat-home-title { margin: 0; color: #fff; font-size: clamp(1.65rem, 3vw, 2.35rem); font-weight: 800; line-height: 1.18; }
+		.biqat-home-welcome { margin: 0.8rem 0 0; color: #d1fae5; font-size: 0.95rem; line-height: 1.6; }
+		.biqat-home-welcome strong { color: #fbbf24; }
+		.biqat-home-progress { --biqat-home-progress: 0deg; position: relative; z-index: 1; display: grid; width: 9.25rem; height: 9.25rem; place-items: center; border-radius: 999px; background: conic-gradient(#fbbf24 var(--biqat-home-progress), rgb(255 255 255 / 0.13) 0); }
+		.biqat-home-progress::before { content: ""; position: absolute; inset: 0.65rem; border-radius: inherit; background: #043f32; }
+		.biqat-home-progress-content { position: relative; display: grid; gap: 0.1rem; place-items: center; text-align: center; }
+		.biqat-home-progress-value { color: #fff; font-size: 1.8rem; font-weight: 800; line-height: 1; }
+		.biqat-home-progress-label { max-width: 5.5rem; color: #a7f3d0; font-size: 0.62rem; font-weight: 700; line-height: 1.2; text-transform: uppercase; }
+		.biqat-home-progress-detail { color: #fde68a; font-size: 0.66rem; }
+		.biqat-home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; }
+		.biqat-home-metric { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.8rem; align-items: center; min-width: 0; padding: 1rem; border: 1px solid var(--outline-gray-1, #e5e7eb); border-radius: 0.8rem; background: var(--surface-base, #fff); box-shadow: 0 2px 8px rgb(15 23 42 / 0.04); }
+		.biqat-home-metric-icon { display: grid; width: 2.4rem; height: 2.4rem; place-items: center; border-radius: 0.7rem; background: #ecfdf5; font-size: 1.1rem; }
+		.biqat-home-metric-value { color: var(--ink-gray-9, #111827); font-size: 1.35rem; font-weight: 800; line-height: 1.1; }
+		.biqat-home-metric-label { color: var(--ink-gray-5, #6b7280); font-size: 0.72rem; line-height: 1.25; }
+		.biqat-home-resources { display: grid; grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); gap: 1rem; }
+		.biqat-home-panel { padding: 1.25rem; border: 1px solid var(--outline-gray-1, #e5e7eb); border-radius: 0.9rem; background: var(--surface-base, #fff); }
+		.biqat-home-panel-heading { margin: 0; color: var(--ink-gray-9, #111827); font-size: 1rem; font-weight: 750; }
+		.biqat-home-panel-description { margin: 0.25rem 0 1rem; color: var(--ink-gray-5, #6b7280); font-size: 0.78rem; }
+		.biqat-home-guide { border-top: 1px solid var(--outline-gray-1, #e5e7eb); }
+		.biqat-home-guide summary { display: flex; align-items: center; gap: 0.65rem; padding: 0.8rem 0; color: var(--ink-gray-8, #1f2937); font-size: 0.84rem; font-weight: 650; cursor: pointer; list-style: none; }
+		.biqat-home-guide summary::-webkit-details-marker { display: none; }
+		.biqat-home-guide summary::after { content: "+"; margin-inline-start: auto; color: #047857; font-size: 1rem; }
+		.biqat-home-guide[open] summary::after { content: "−"; }
+		.biqat-home-guide p { margin: -0.25rem 0 0.85rem 2rem; color: var(--ink-gray-6, #4b5563); font-size: 0.78rem; line-height: 1.55; }
+		.biqat-home-step { display: grid; width: 1.35rem; height: 1.35rem; flex: 0 0 auto; place-items: center; border-radius: 999px; background: #d1fae5; color: #065f46; font-size: 0.68rem; }
+		.biqat-home-links { display: grid; gap: 0.6rem; }
+		.biqat-home-link { display: flex; align-items: center; gap: 0.65rem; padding: 0.7rem; border: 1px solid #d1fae5; border-radius: 0.65rem; color: var(--ink-gray-8, #1f2937); text-decoration: none; transition: border-color 150ms ease, background 150ms ease, transform 150ms ease; }
+		.biqat-home-link:hover { border-color: #34d399; background: #ecfdf5; transform: translateY(-1px); }
+		.biqat-home-link-icon { display: grid; width: 2rem; height: 2rem; flex: 0 0 auto; place-items: center; border-radius: 0.55rem; background: #ecfdf5; }
+		.biqat-home-link-copy { min-width: 0; flex: 1; }
+		.biqat-home-link-copy strong { display: block; color: var(--ink-gray-9, #111827); font-size: 0.78rem; }
+		.biqat-home-link-copy span { display: block; overflow: hidden; color: var(--ink-gray-5, #6b7280); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
+		.biqat-home-link-arrow { color: #047857; }
+		@keyframes biqat-home-enter { from { opacity: 0; transform: translateY(0.25rem); } to { opacity: 1; transform: translateY(0); } }
+
+		@media (max-width: 900px) {
+			.biqat-home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+			.biqat-home-resources { grid-template-columns: 1fr; }
+		}
+		@media (max-width: 640px) {
+			.biqat-form-grid { grid-template-columns: 1fr; }
+			.biqat-home-hero { grid-template-columns: 1fr; padding: 1.35rem; }
+			.biqat-home-progress { width: 8rem; height: 8rem; justify-self: center; }
+			.biqat-home-metrics { grid-template-columns: 1fr; }
+		}
 	`;
 	document.head.appendChild(style);
 }
@@ -2266,6 +2325,187 @@ function renderManagedInstructorPicker(picker, profiles, resourceType, resourceN
 	updateSummary();
 }
 
+let homeDashboardCache;
+let homeDashboardPromise;
+
+function isLmsHomePath() {
+	const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+	return currentPath === getLmsBasePath();
+}
+
+function findLmsHomePage() {
+	for (const page of document.querySelectorAll(".w-full.px-5.pt-5.pb-10")) {
+		if (page.querySelector(":scope > .space-y-2")) return page;
+	}
+	return null;
+}
+
+function dashboardNumber(value) {
+	const number = Number(value);
+	return Number.isFinite(number) && number > 0 ? Math.round(number) : 0;
+}
+
+function metricMarkup(icon, field, label) {
+	return `
+		<div class="biqat-home-metric">
+			<span class="biqat-home-metric-icon" aria-hidden="true">${icon}</span>
+			<div>
+				<div class="biqat-home-metric-value" data-biqat-home-value="${field}">0</div>
+				<div class="biqat-home-metric-label">${label}</div>
+			</div>
+		</div>`;
+}
+
+function homeLinkMarkup(icon, key, title, description) {
+	return `
+		<a class="biqat-home-link" data-biqat-home-link="${key}">
+			<span class="biqat-home-link-icon" aria-hidden="true">${icon}</span>
+			<span class="biqat-home-link-copy"><strong>${title}</strong><span>${description}</span></span>
+			<span class="biqat-home-link-arrow" aria-hidden="true">→</span>
+		</a>`;
+}
+
+function renderStudentHomeDashboard(dashboard, data, nativeHeading) {
+	const enrolledCourses = dashboardNumber(data.enrolled_courses);
+	const completedCourses = Math.min(dashboardNumber(data.completed_courses), enrolledCourses);
+	const completionPercent = Math.min(dashboardNumber(data.completion_percent), 100);
+	const activeCourses = Math.max(enrolledCourses - completedCourses, 0);
+	const basePath = getLmsBasePath();
+
+	dashboard.innerHTML = `
+		<section class="biqat-home-hero">
+			<div class="biqat-home-hero-copy">
+				<div class="biqat-home-eyebrow"><span class="biqat-home-eyebrow-dot"></span>ብቃት • Professional Learning</div>
+				<h1 class="biqat-home-title">እንኳን ወደ ብቃት መድረክ በደህና መጡ!</h1>
+				<p class="biqat-home-welcome">Welcome, <strong data-biqat-home-name></strong>. Continue building practical expertise and track your learning achievements in one place.</p>
+			</div>
+			<div class="biqat-home-progress" role="img" aria-label="Course completion">
+				<div class="biqat-home-progress-content">
+					<span class="biqat-home-progress-value" data-biqat-home-progress>0%</span>
+					<span class="biqat-home-progress-label">Course completion</span>
+					<span class="biqat-home-progress-detail" data-biqat-home-progress-detail></span>
+				</div>
+			</div>
+		</section>
+		<section class="biqat-home-metrics" aria-label="Learning overview">
+			${metricMarkup("📖", "active", "Active courses")}
+			${metricMarkup("✓", "completed", "Completed courses")}
+			${metricMarkup("🎓", "certificates", "Certificates earned")}
+			${metricMarkup("🔥", "streak", "Current learning streak")}
+		</section>
+		<section class="biqat-home-resources">
+			<div class="biqat-home-panel">
+				<h2 class="biqat-home-panel-heading">Your professional learning guide</h2>
+				<p class="biqat-home-panel-description">A simple path from selecting a course to recording an achievement.</p>
+				<details class="biqat-home-guide" open>
+					<summary><span class="biqat-home-step">1</span>Plan your learning</summary>
+					<p>Choose courses and scheduled programs that match the skills you want to strengthen.</p>
+				</details>
+				<details class="biqat-home-guide">
+					<summary><span class="biqat-home-step">2</span>Build practical expertise</summary>
+					<p>Continue lessons, attend live sessions, and complete the required learning activities.</p>
+				</details>
+				<details class="biqat-home-guide">
+					<summary><span class="biqat-home-step">3</span>Track your achievements</summary>
+					<p>Review completed courses and access certificates issued through the platform.</p>
+				</details>
+			</div>
+			<nav class="biqat-home-panel" aria-label="Quick navigation">
+				<h2 class="biqat-home-panel-heading">Quick navigation</h2>
+				<p class="biqat-home-panel-description"><span data-biqat-home-batches>0</span> registered training batch(es)</p>
+				<div class="biqat-home-links">
+					${homeLinkMarkup("⌕", "courses", "Browse courses", "Explore the course catalog")}
+					${homeLinkMarkup("▦", "batches", "My batches", "Open scheduled training")}
+					${homeLinkMarkup("☆", "certificates", "Certificates", "Review earned credentials")}
+				</div>
+			</nav>
+		</section>`;
+
+	dashboard.querySelector("[data-biqat-home-name]").textContent = data.full_name || data.user || "Learner";
+	dashboard.querySelector("[data-biqat-home-progress]").textContent = `${completionPercent}%`;
+	dashboard.querySelector("[data-biqat-home-progress-detail]").textContent = `${completedCourses} of ${enrolledCourses} complete`;
+	dashboard.querySelector(".biqat-home-progress").style.setProperty("--biqat-home-progress", `${completionPercent * 3.6}deg`);
+	dashboard.querySelector('[data-biqat-home-value="active"]').textContent = activeCourses;
+	dashboard.querySelector('[data-biqat-home-value="completed"]').textContent = completedCourses;
+	dashboard.querySelector('[data-biqat-home-value="certificates"]').textContent = dashboardNumber(data.certificates);
+	dashboard.querySelector('[data-biqat-home-value="streak"]').textContent = `${dashboardNumber(data.current_streak)} days`;
+	dashboard.querySelector("[data-biqat-home-batches]").textContent = dashboardNumber(data.batches);
+
+	dashboard.querySelector('[data-biqat-home-link="courses"]').href = `${basePath}/courses`;
+	dashboard.querySelector('[data-biqat-home-link="batches"]').href = `${basePath}/batches`;
+	dashboard.querySelector('[data-biqat-home-link="certificates"]').href = `${basePath}/user/${encodeURIComponent(data.user)}/certificates`;
+
+	dashboard.hidden = false;
+	dashboard.dataset.state = "ready";
+	nativeHeading?.classList.add("biqat-home-native-heading-hidden");
+}
+
+function loadHomeDashboardData() {
+	const now = Date.now();
+	if (homeDashboardCache && now - homeDashboardCache.loadedAt < HOME_DASHBOARD_CACHE_MS) {
+		return Promise.resolve(homeDashboardCache.data);
+	}
+	if (homeDashboardPromise) return homeDashboardPromise;
+
+	homeDashboardPromise = apiCall(
+		"get_home_dashboard",
+		{},
+		"/api/method/biqat_lms.home_dashboard"
+	)
+		.then((data) => {
+			homeDashboardCache = { data, loadedAt: Date.now() };
+			return data;
+		})
+		.finally(() => {
+			homeDashboardPromise = null;
+		});
+	return homeDashboardPromise;
+}
+
+function removeStudentHomeDashboard() {
+	document.getElementById(HOME_DASHBOARD_ID)?.remove();
+	for (const heading of document.querySelectorAll(".biqat-home-native-heading-hidden")) {
+		heading.classList.remove("biqat-home-native-heading-hidden");
+	}
+}
+
+async function ensureStudentHomeDashboard() {
+	if (!isLmsHomePath()) {
+		removeStudentHomeDashboard();
+		return;
+	}
+	if (document.getElementById(HOME_DASHBOARD_ID)) return;
+	if (
+		homeDashboardCache?.data?.show === false &&
+		Date.now() - homeDashboardCache.loadedAt < HOME_DASHBOARD_CACHE_MS
+	) {
+		return;
+	}
+
+	const page = findLmsHomePage();
+	if (!page) return;
+	const nativeHeading = page.querySelector(":scope > .space-y-2");
+	const dashboard = document.createElement("div");
+	dashboard.id = HOME_DASHBOARD_ID;
+	dashboard.dataset.state = "loading";
+	dashboard.hidden = true;
+	page.prepend(dashboard);
+
+	try {
+		const data = await loadHomeDashboardData();
+		if (!dashboard.isConnected || !isLmsHomePath()) return;
+		if (!data?.show) {
+			dashboard.remove();
+			return;
+		}
+		renderStudentHomeDashboard(dashboard, data, nativeHeading);
+	} catch (error) {
+		// Keep the stock LMS Home fully usable when the optional dashboard fails.
+		console.warn("Biqat Home dashboard could not be loaded", error);
+		dashboard.remove();
+	}
+}
+
 let updateScheduled = false;
 const observer = new MutationObserver(() => {
 	if (updateScheduled) return;
@@ -2276,6 +2516,7 @@ const observer = new MutationObserver(() => {
 		relabelManagedInstructorCards();
 		applySidebarLanguage();
 		repairBrandingImages();
+		ensureStudentHomeDashboard();
 		ensureUsersInstructorSection();
 		ensureCourseInstructorPickers();
 		ensureLiveClassManagerButton();
@@ -2292,6 +2533,7 @@ function initializeDomCustomizations() {
 	relabelManagedInstructorCards();
 	applySidebarLanguage();
 	repairBrandingImages();
+	ensureStudentHomeDashboard();
 	ensureUsersInstructorSection();
 	ensureCourseInstructorPickers();
 	ensureLiveClassManagerButton();
