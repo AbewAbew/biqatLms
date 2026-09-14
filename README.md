@@ -134,6 +134,13 @@ market without making an external payment connection:
 No Chapa API key, secret, endpoint call, or live payment behavior exists yet.
 Secrets must never be committed when that integration is added.
 
+## Default LMS theme
+
+New visitors start in dark mode. Biqat initializes the native LMS `theme`
+preference before the frontend bundle loads, avoiding an initial light flash.
+An existing light or dark choice is preserved; users can change it with the
+standard theme switch. The public landing page retains its black-and-gold design.
+
 ## Branding image compatibility
 
 Frappe Learning v2.60.1 returns consistent file objects for its logo and
@@ -303,7 +310,7 @@ For the landing-page release, also verify:
 
 ```bash
 curl -fsS https://biqat.lexprime.et/ | grep 'Legal Learning'
-curl -fsS https://biqat.lexprime.et/lms/courses | grep 'course_languages.js?v=1'
+curl -fsS https://biqat.lexprime.et/lms/courses | grep 'course_languages.js?v=2'
 ```
 
 Open the public homepage in a private window, follow **Explore Courses**, and

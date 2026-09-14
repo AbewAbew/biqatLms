@@ -106,7 +106,7 @@
 			#${FILTER_ID} .language-options { display:flex; flex-wrap:wrap; gap:4px; padding:4px; border:1px solid var(--outline-gray-2,#ddd); border-radius:10px; }
 			#${FILTER_ID} a, .biqat-language-manage { padding:7px 12px; border-radius:7px; font-size:13px; color:var(--ink-gray-7,#444); text-decoration:none; }
 			#${FILTER_ID} a:hover { background:var(--surface-gray-2,#f3f4f6); }
-			#${FILTER_ID} a[aria-current="true"] { color:var(--surface-white,#fff); background:var(--ink-gray-9,#171717); }
+			#${FILTER_ID} a[aria-current="true"] { color:var(--surface-base,#fff); background:var(--ink-gray-9,#171717); }
 			.biqat-language-manage { margin-left:auto; border:1px solid var(--outline-gray-2,#ddd); }
 			#${FILTER_ID} a:focus-visible, .biqat-language-manage:focus-visible { outline:2px solid #b3832b; outline-offset:3px; }
 			.biqat-language-dialog { width:min(760px,calc(100vw - 32px)); max-height:85dvh; margin:auto; padding:24px; border:1px solid var(--outline-gray-2,#ddd); border-radius:14px; background:var(--surface-base,#fff); color:var(--ink-gray-9,#171717); }

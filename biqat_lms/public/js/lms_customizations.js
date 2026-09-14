@@ -1,3 +1,19 @@
+// Seed the native preference before the LMS bundle initializes its theme.
+// Keep an existing light/dark choice so the standard theme switch still works.
+function initializeLmsTheme() {
+	let theme = "dark";
+	try {
+		const saved = localStorage.getItem("theme");
+		if (saved === "light" || saved === "dark") theme = saved;
+		else localStorage.setItem("theme", theme);
+	} catch {
+		// The initial page can still use dark colors if storage is unavailable.
+	}
+	document.documentElement.setAttribute("data-theme", theme);
+}
+
+initializeLmsTheme();
+
 const INDIA_GST_LABEL = "Apply GST for India";
 const COURSE_CREATOR_LABEL = "Course creator";
 const MANAGED_INSTRUCTOR_LABEL = "Instructor";
