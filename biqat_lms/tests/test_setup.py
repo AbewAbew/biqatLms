@@ -20,7 +20,12 @@ from biqat_lms.api import (
 	telemetry_boot_config,
 )
 from biqat_lms.overrides.lms_live_class import BiqatLMSLiveClass
-from biqat_lms.page_renderers import COURSE_LANGUAGE_SCRIPT, CUSTOMIZATION_SCRIPT, inject_customization_script
+from biqat_lms.page_renderers import (
+	COURSE_LANGUAGE_SCRIPT,
+	CUSTOMIZATION_SCRIPT,
+	THEME_SCRIPT,
+	inject_customization_script,
+)
 from biqat_lms.setup.payment_defaults import (
 	CHAPA_GATEWAY,
 	CHAPA_SETTINGS_DOCTYPE,
@@ -114,6 +119,8 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		)
 		customized_html = inject_customization_script(html)
 
+		self.assertIn(THEME_SCRIPT, customized_html)
+		self.assertLess(customized_html.index(THEME_SCRIPT), customized_html.index(CUSTOMIZATION_SCRIPT))
 		self.assertIn(CUSTOMIZATION_SCRIPT, customized_html)
 		self.assertIn(COURSE_LANGUAGE_SCRIPT, customized_html)
 		self.assertEqual(customized_html.count(CUSTOMIZATION_SCRIPT), 1)

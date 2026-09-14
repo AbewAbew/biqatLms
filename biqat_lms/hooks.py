@@ -32,6 +32,9 @@ required_apps = ["frappe/lms"]
 # web_include_css = "/assets/biqat_lms/css/biqat_lms.css"
 # web_include_js = "/assets/biqat_lms/js/biqat_lms.js"
 
+# Initialize the website theme in <head>, including native authentication pages.
+base_template = "templates/biqat_base.html"
+
 # include custom scss in every website theme (without file extension ".scss")
 # website_theme_scss = "biqat_lms/public/scss/website"
 

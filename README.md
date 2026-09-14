@@ -136,12 +136,23 @@ market without making an external payment connection:
 No Chapa API key, secret, endpoint call, or live payment behavior exists yet.
 Secrets must never be committed when that integration is added.
 
-## Default LMS theme
+## Default theme for visitors and learners
 
-New visitors start in dark mode. Biqat initializes the native LMS `theme`
-preference before the frontend bundle loads, avoiding an initial light flash.
-An existing light or dark choice is preserved; users can change it with the
-standard theme switch. The public landing page retains its black-and-gold design.
+Dark is the default on the public website, login, signup, password recovery,
+password update and LMS pages, for both guests and signed-in learners. A shared
+script initializes the theme before rendering. The native website templates
+load a separate dark palette for authentication cards, inputs, buttons and
+navigation; authentication behavior remains owned by Frappe.
+
+This rollout also switches returning browsers to dark once, because the former
+LMS automatically saved its light default. After that, an explicit selection
+through the standard LMS theme switch persists across the website and LMS.
+The public landing page always retains its black-and-gold design.
+
+Theme assets: `biqat_lms/public/js/theme.js`,
+`biqat_lms/public/css/website-theme.css`, and
+`biqat_lms/templates/biqat_base.html`. Clear the site cache after deployment so
+Frappe picks up the website base-template hook.
 
 ## Branding image compatibility
 

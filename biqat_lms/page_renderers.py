@@ -1,7 +1,8 @@
 from frappe.website.page_renderers.base_renderer import BaseRenderer
 from frappe.website.page_renderers.template_page import TemplatePage
 
-CUSTOMIZATION_SCRIPT = '<script src="/assets/biqat_lms/js/lms_customizations.js?v=35"></script>'
+THEME_SCRIPT = '<script src="/assets/biqat_lms/js/theme.js?v=1"></script>'
+CUSTOMIZATION_SCRIPT = '<script src="/assets/biqat_lms/js/lms_customizations.js?v=36"></script>'
 COURSE_LANGUAGE_SCRIPT = '<script src="/assets/biqat_lms/js/course_languages.js?v=3"></script>'
 
 
@@ -21,4 +22,6 @@ class BiqatLMSRenderer(BaseRenderer):
 def inject_customization_script(html: str) -> str:
 	if CUSTOMIZATION_SCRIPT in html:
 		return html
-	return html.replace("<head>", f"<head>\n\t{CUSTOMIZATION_SCRIPT}\n\t{COURSE_LANGUAGE_SCRIPT}", 1)
+	return html.replace(
+		"<head>", f"<head>\n\t{THEME_SCRIPT}\n\t{CUSTOMIZATION_SCRIPT}\n\t{COURSE_LANGUAGE_SCRIPT}", 1
+	)
