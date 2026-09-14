@@ -74,7 +74,9 @@ bench --site learning.localhost run-tests --app biqat_lms
 ## Menbere Tsehay landing page and course languages
 
 The public root `/` serves **Menbere Tsehay Training Series**, using the supplied
-black-and-gold solar design with legal-training copy. **Explore Courses** links
+black-and-gold solar design with legal-training copy. The supplied gold scales
+logo appears in the header and browser tab; its original PNG is included in
+`biqat_lms/public/images/menbere-tsehay-logo.png`. **Explore Courses** links
 to `/lms/courses` (or the configured LMS base path). `/lms` retains the learner
 dashboard and OAuth's `/me` fallback. Existing role or portal homepage overrides
 still take precedence for signed-in users.

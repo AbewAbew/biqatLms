@@ -78,7 +78,8 @@ body {
 	justify-content: space-between;
 	align-items: center;
 	z-index: 50;
-	mix-blend-mode: difference;
+	gap: 1rem;
+	background: linear-gradient(180deg, rgb(5 6 8 / 90%), transparent);
 }
 
 @media (max-width: 768px) {
@@ -99,13 +100,11 @@ body {
 	gap: 0.75rem;
 }
 
-.brand-mark .solar-glyph {
-	display: inline-block;
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--gold-bright);
-	box-shadow: 0 0 12px var(--gold-bright);
+.brand-logo {
+	display: block;
+	width: 64px;
+	height: auto;
+	flex-shrink: 0;
 }
 
 .nav-status {
@@ -628,6 +627,15 @@ summary:focus-visible {
 	.brand-mark {
 		font-size: 0.7rem;
 		letter-spacing: 0.14em;
+	}
+	.brand-logo {
+		width: 44px;
+	}
+	.brand-name {
+		line-height: 1.6;
+	}
+	.brand-name span {
+		display: block;
 	}
 	.nav-status {
 		font-size: 0.65rem;
