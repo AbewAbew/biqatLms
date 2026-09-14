@@ -33,21 +33,22 @@ from lms.lms.utils import (
 	get_batches as lms_get_batches,
 )
 from lms.lms.utils import (
-	get_course_details as lms_get_course_details,
-)
-from lms.lms.utils import (
-	get_courses as lms_get_courses,
-)
-from lms.lms.utils import (
 	get_chart_data as lms_get_chart_data,
 )
 from lms.lms.utils import (
 	get_course_completion_data as lms_get_course_completion_data,
 )
 from lms.lms.utils import (
+	get_course_details as lms_get_course_details,
+)
+from lms.lms.utils import (
+	get_courses as lms_get_courses,
+)
+from lms.lms.utils import (
 	get_program_details as lms_get_program_details,
 )
 
+from biqat_lms.course_languages import apply_language_filter
 from biqat_lms.setup.instructor_profiles import valid_link_names
 from biqat_lms.setup.programs import sync_program_member_count
 
@@ -132,8 +133,9 @@ def _row_name(row):
 
 
 @frappe.whitelist(allow_guest=True)
-def get_courses(filters: dict | None = None, start: int = 0):
+def get_courses(filters: dict | None = None, start: int = 0, course_language: str | None = None):
 	"""Return LMS courses with separate public expert attribution."""
+	filters = apply_language_filter(filters, course_language)
 	courses = lms_get_courses(filters=filters, start=start)
 	course_names = [course.name for course in courses]
 	experts_by_course = get_course_experts_map(course_names)
@@ -945,8 +947,8 @@ def get_chart_details():
 def get_chart_data(
 	chart_name: str,
 	timegrain: str = "Daily",
-	from_date: str = None,
-	to_date: str = None,
+	from_date: str | None = None,
+	to_date: str | None = None,
 ):
 	_assert_can_view_statistics()
 	return lms_get_chart_data(chart_name, timegrain, from_date, to_date)

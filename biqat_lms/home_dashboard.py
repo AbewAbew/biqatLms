@@ -3,7 +3,6 @@ from frappe import _
 from frappe.utils import flt
 from lms.lms.api import get_streak_info
 
-
 LMS_STAFF_ROLES = {"Moderator", "Course Creator", "Batch Evaluator"}
 
 

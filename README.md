@@ -45,33 +45,74 @@ locally.
 The local Bench is located at:
 
 ```text
-/home/solskjaer/biqat/learning-bench
+/home/drse/Projects/wsl_projects/wsl/biqat/learning-bench
 ```
 
-The local site is `learning.localhost`, and its dedicated MariaDB container
-listens only on `127.0.0.1:3307`. This keeps it separate from other Frappe
-projects in WSL.
+The local site is `learning.localhost`. This checkout uses the existing local
+MariaDB service and Bench-managed Redis. The root Docker Compose file belongs
+to the earlier database setup and is not needed to run this Bench.
 
-Start the local database and Bench:
+With the local MariaDB service running, start Bench:
 
 ```bash
-cd /home/solskjaer/biqat
-docker compose up -d database
-
-cd /home/solskjaer/biqat/learning-bench
+cd /home/drse/Projects/wsl_projects/wsl/biqat/learning-bench
 bench start
 ```
 
-Open <http://learning.localhost:8100/lms>.
+Open <http://learning.localhost:8100/> for the landing page, or
+<http://learning.localhost:8100/lms/courses> for the course catalogue.
 
 Before committing a customization, run:
 
 ```bash
-cd /home/solskjaer/biqat/learning-bench
+cd /home/drse/Projects/wsl_projects/wsl/biqat/learning-bench
 bench --site learning.localhost migrate
 bench build --app biqat_lms
 bench --site learning.localhost run-tests --app biqat_lms
 ```
+
+## Menbere Tsehay landing page and course languages
+
+The public root `/` serves **Menbere Tsehay Training Series**, using the supplied
+black-and-gold solar design with legal-training copy. **Explore Courses** links
+to `/lms/courses` (or the configured LMS base path). `/lms` retains the learner
+dashboard and OAuth's `/me` fallback. Existing role or portal homepage overrides
+still take precedence for signed-in users.
+
+The four expandable rows describe the series's learning focus, rather than
+advertising unconfirmed course titles or accreditation. Native HTML accordions
+work with a keyboard and without JavaScript/WebGL. The solar effect has a
+static fallback, respects reduced motion, caps rendering resolution and pauses
+when the hero or browser tab is hidden. Fonts use the same Google Fonts families
+as the reference, with local fallbacks.
+
+The catalogue offers **All languages / አማርኛ / English**. Language selection is
+stored in the URL (`?course_language=am` or `en`) and applied in the server query
+before pagination and featured-course selection. Search, category, certification
+and the selected catalogue tab are preserved. Switching languages reloads the
+page to reset the upstream list cache and pagination. The existing sidebar
+language switch remains independent.
+
+To classify courses:
+
+1. Sign in as a course editor, Moderator, System Manager or Administrator.
+2. Open **Courses → Manage course languages**.
+3. Find a course and choose **Amharic**, **English** or **Unclassified**.
+   Each change saves automatically. Editors see only courses assigned to them;
+   administrators and moderators can manage all courses.
+4. Close the dialog to refresh the catalogue with the saved assignments.
+
+The field is also available as **Course Language** on the Desk LMS Course form.
+Migration adds `biqat_language` without assigning a default to existing courses.
+Unclassified courses appear under **All languages** only. Classify production
+courses after deployment; language metadata and course content stay in the site
+database, not Git. Guest course browsing follows the existing LMS guest-access
+setting; the public landing page itself does not require login.
+
+Implementation: `biqat_lms/www/menbere-tsehay.html`,
+`biqat_lms/www/menbere_tsehay.py`, `biqat_lms/public/css/landing.css`,
+`biqat_lms/public/js/landing.js`, `biqat_lms/public/js/course_languages.js`, and
+`biqat_lms/course_languages.py`. The pinned upstream LMS app is unchanged.
 
 ## Ethiopian payment defaults
 
@@ -142,7 +183,7 @@ files and site data must not be committed.
 After a change works locally:
 
 ```bash
-cd /home/solskjaer/biqat/learning-bench/apps/biqat_lms
+cd /home/drse/Projects/wsl_projects/wsl/biqat/learning-bench/apps/biqat_lms
 git status
 git add <changed-files>
 git commit -m "Describe the tested change"
@@ -242,6 +283,7 @@ git -C apps/biqat_lms pull --ff-only upstream main
 bench setup requirements --python
 bench --site biqat.localhost migrate
 bench build --app biqat_lms
+bench --site biqat.localhost clear-cache
 bench restart
 ```
 
@@ -256,6 +298,17 @@ curl -I -H "Host: biqat.localhost" http://127.0.0.1/lms
 curl -s https://biqat.lexprime.et/lms/batches \
   | grep -o 'lms_customizations.js?v=[0-9]*'
 ```
+
+For the landing-page release, also verify:
+
+```bash
+curl -fsS https://biqat.lexprime.et/ | grep 'Legal Learning'
+curl -fsS https://biqat.lexprime.et/lms/courses | grep 'course_languages.js?v=1'
+```
+
+Open the public homepage in a private window, follow **Explore Courses**, and
+check both language filters. Use **Manage course languages** to classify real
+production courses before expecting results in a language-specific list.
 
 All Supervisor processes should report `RUNNING`, and the HTTP request should
 return a successful response. The live script version must match the version in

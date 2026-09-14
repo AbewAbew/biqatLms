@@ -1,0 +1,705 @@
+/* ==========================================================================
+       RADICAL MINIMALISM & MONUMENTAL LUXURY
+       Theme: Menbere Tsehay (መንበረ ፀሐይ) — Seat of the Sun
+       Strictly 2 Sections: Hero + The Course Showcase
+       ========================================================================== */
+:root {
+	--bg-black: #050608;
+	--bg-card: rgba(14, 16, 22, 0.65);
+	--gold-bright: #ffd479;
+	--gold-primary: #e6b758;
+	--gold-deep: #b3832b;
+	--amber-flare: #ff7e29;
+	--text-white: #f5f5f7;
+	--text-muted: #828794;
+	--border-line: rgba(230, 183, 88, 0.18);
+	--border-glow: rgba(255, 212, 121, 0.4);
+	--font-display: "Italiana", serif;
+	--font-sans: "Syne", sans-serif;
+	--font-mono: "Space Mono", monospace;
+	--ease-cinema: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body {
+	width: 100%;
+	background-color: var(--bg-black);
+	color: var(--text-white);
+	font-family: var(--font-sans);
+	overflow-x: hidden;
+	scroll-behavior: smooth;
+}
+
+::selection {
+	background: var(--gold-primary);
+	color: #000;
+}
+
+/* Ambient Film Texture */
+.film-grain {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	pointer-events: none;
+	z-index: 90;
+	opacity: 0.035;
+	background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Interactive WebGL Solar Core Canvas */
+#webgl-canvas {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	z-index: 1;
+	pointer-events: none;
+}
+
+/* Minimal Top Navigation */
+.top-bar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	padding: 2.5rem 3.5rem;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	z-index: 50;
+	mix-blend-mode: difference;
+}
+
+@media (max-width: 768px) {
+	.top-bar {
+		padding: 1.5rem 1.75rem;
+	}
+}
+
+.brand-mark {
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+	letter-spacing: 0.35em;
+	text-transform: uppercase;
+	color: var(--text-white);
+	text-decoration: none;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.brand-mark .solar-glyph {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--gold-bright);
+	box-shadow: 0 0 12px var(--gold-bright);
+}
+
+.nav-status {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	letter-spacing: 0.25em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+/* ==========================================================================
+       SECTION 1: THE MONUMENTAL HERO
+       ========================================================================== */
+.hero-section {
+	position: relative;
+	min-height: 100vh;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: 8rem 3.5rem 4rem;
+	z-index: 10;
+}
+
+@media (max-width: 768px) {
+	.hero-section {
+		padding: 7rem 1.75rem 3rem;
+	}
+}
+
+.hero-center {
+	margin: auto 0;
+	max-width: 1400px;
+}
+
+/* Monumental Kinetic Typography */
+.hero-inscript {
+	font-family: var(--font-mono);
+	font-size: clamp(0.75rem, 1.1vw, 0.95rem);
+	letter-spacing: 0.45em;
+	text-transform: uppercase;
+	color: var(--gold-primary);
+	margin-bottom: 2rem;
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.hero-inscript::after {
+	content: "";
+	display: inline-block;
+	width: 60px;
+	height: 1px;
+	background: var(--gold-primary);
+	opacity: 0.5;
+}
+
+.hero-title {
+	font-family: var(--font-display);
+	font-size: clamp(3.75rem, 11vw, 11rem);
+	font-weight: 400;
+	line-height: 0.88;
+	letter-spacing: -0.02em;
+	text-transform: uppercase;
+	color: var(--text-white);
+	margin-bottom: 2.5rem;
+	text-shadow: 0 20px 80px rgba(0, 0, 0, 0.9);
+}
+
+.hero-title .glow-span {
+	display: inline-block;
+	background: linear-gradient(
+		135deg,
+		#ffffff 10%,
+		var(--gold-bright) 60%,
+		var(--amber-flare) 100%
+	);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	font-style: italic;
+}
+
+.hero-bottom-grid {
+	display: grid;
+	grid-template-columns: 1.2fr 1fr;
+	gap: 4rem;
+	align-items: flex-end;
+	margin-top: 1rem;
+}
+
+@media (max-width: 900px) {
+	.hero-bottom-grid {
+		grid-template-columns: 1fr;
+		gap: 2.5rem;
+	}
+}
+
+.hero-manifesto {
+	font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+	font-weight: 400;
+	line-height: 1.65;
+	color: var(--text-muted);
+	max-width: 580px;
+}
+
+.hero-manifesto strong {
+	color: var(--text-white);
+	font-weight: 600;
+}
+
+/* THE ONE-OF-A-KIND MAGNETIC COURSE BUTTON */
+.cta-container {
+	display: flex;
+	justify-content: flex-end;
+	align-items: center;
+}
+
+@media (max-width: 900px) {
+	.cta-container {
+		justify-content: flex-start;
+	}
+}
+
+.magnetic-course-btn {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 1.75rem;
+	padding: 1.6rem 3.4rem;
+	background: rgba(18, 20, 28, 0.7);
+	border: 1px solid var(--border-glow);
+	border-radius: 999px;
+	color: var(--text-white);
+	text-decoration: none;
+	font-family: var(--font-mono);
+	font-size: 0.95rem;
+	letter-spacing: 0.22em;
+	text-transform: uppercase;
+	box-shadow:
+		0 20px 50px rgba(0, 0, 0, 0.8),
+		0 0 35px rgba(230, 183, 88, 0.15);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	transition: all 0.5s var(--ease-cinema);
+	cursor: pointer;
+	overflow: hidden;
+}
+
+/* Dynamic Golden Aura on Hover */
+.magnetic-course-btn::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 150%;
+	height: 200%;
+	background: radial-gradient(
+		circle,
+		rgba(255, 212, 121, 0.35) 0%,
+		rgba(255, 126, 41, 0.1) 40%,
+		transparent 70%
+	);
+	transform: translate(-50%, -50%) scale(0.5);
+	opacity: 0;
+	transition: all 0.6s var(--ease-cinema);
+	pointer-events: none;
+}
+
+.magnetic-course-btn:hover {
+	border-color: var(--gold-bright);
+	color: #000;
+	background: var(--gold-bright);
+	box-shadow:
+		0 20px 60px rgba(230, 183, 88, 0.5),
+		0 0 50px var(--gold-bright);
+	transform: translateY(-4px) scale(1.03);
+}
+
+.magnetic-course-btn:hover::before {
+	opacity: 1;
+	transform: translate(-50%, -50%) scale(1);
+}
+
+.btn-orb {
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--gold-bright);
+	box-shadow: 0 0 14px var(--gold-bright);
+	transition:
+		transform 0.4s ease,
+		background 0.3s;
+}
+
+.magnetic-course-btn:hover .btn-orb {
+	background: #000;
+	box-shadow: none;
+	transform: scale(1.3);
+}
+
+.btn-arrow {
+	transition: transform 0.4s ease;
+}
+
+.magnetic-course-btn:hover .btn-arrow {
+	transform: translateX(6px);
+}
+
+/* Scroll Indicator */
+.hero-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	padding-top: 2rem;
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	letter-spacing: 0.2em;
+	color: var(--text-muted);
+	text-transform: uppercase;
+}
+
+.scroll-cue {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--text-muted);
+	text-decoration: none;
+	transition: color 0.3s ease;
+}
+
+.scroll-cue:hover {
+	color: var(--gold-bright);
+}
+
+/* ==========================================================================
+       SECTION 2: THE MONOLITHIC COURSE SHOWCASE
+       ========================================================================== */
+.course-section {
+	position: relative;
+	min-height: 100vh;
+	width: 100%;
+	padding: 8rem 3.5rem 6rem;
+	z-index: 10;
+	background: linear-gradient(180deg, transparent 0%, rgba(5, 6, 8, 0.95) 20%, #050608 100%);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+@media (max-width: 768px) {
+	.course-section {
+		padding: 6rem 1.75rem 4rem;
+	}
+}
+
+.section-headline-group {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 5rem;
+	border-bottom: 1px solid rgba(230, 183, 88, 0.2);
+	padding-bottom: 2.5rem;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+}
+
+.section-title {
+	font-family: var(--font-display);
+	font-size: clamp(2.5rem, 6vw, 5.5rem);
+	font-weight: 400;
+	line-height: 1;
+	letter-spacing: -0.01em;
+	text-transform: uppercase;
+}
+
+.section-tag {
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+	letter-spacing: 0.3em;
+	text-transform: uppercase;
+	color: var(--gold-primary);
+}
+
+/* Interactive Monolithic Accordion Track */
+.monolith-list {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+
+.monolith-item {
+	position: relative;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	padding: 3rem 0;
+	cursor: pointer;
+	transition: all 0.45s var(--ease-cinema);
+}
+
+.monolith-item::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	bottom: -1px;
+	width: 0;
+	height: 1px;
+	background: var(--gold-bright);
+	transition: width 0.6s var(--ease-cinema);
+}
+
+.monolith-item:hover::before,
+.monolith-item[open]::before {
+	width: 100%;
+}
+
+.monolith-item:hover {
+	padding-left: 1.5rem;
+}
+
+.monolith-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 2rem;
+}
+
+.item-left {
+	display: flex;
+	align-items: baseline;
+	gap: 3rem;
+}
+
+@media (max-width: 768px) {
+	.item-left {
+		gap: 1.5rem;
+	}
+}
+
+.item-index {
+	font-family: var(--font-mono);
+	font-size: 1.1rem;
+	color: var(--gold-primary);
+	letter-spacing: 0.1em;
+}
+
+.item-title {
+	font-family: var(--font-sans);
+	font-size: clamp(1.5rem, 3.5vw, 3rem);
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	text-transform: uppercase;
+	color: var(--text-white);
+	transition: color 0.3s ease;
+}
+
+.monolith-item:hover .item-title,
+.monolith-item[open] .item-title {
+	color: var(--gold-bright);
+}
+
+.item-discipline {
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	letter-spacing: 0.25em;
+	color: var(--text-muted);
+	text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+	.item-discipline {
+		display: none;
+	}
+}
+
+.monolith-body {
+	opacity: 1;
+	transition: all 0.6s var(--ease-cinema);
+	padding-left: 5rem;
+}
+
+@media (max-width: 768px) {
+	.monolith-body {
+		padding-left: 2.5rem;
+	}
+}
+
+.monolith-item[open] .monolith-body {
+	opacity: 1;
+	padding-top: 2.5rem;
+	padding-bottom: 1rem;
+}
+
+.body-content {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+	gap: 3rem;
+	align-items: center;
+}
+
+@media (max-width: 900px) {
+	.body-content {
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+}
+
+.module-desc {
+	font-size: 1.15rem;
+	line-height: 1.7;
+	color: var(--text-muted);
+	max-width: 700px;
+}
+
+.module-desc strong {
+	color: var(--text-white);
+}
+
+.enter-module-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 1rem;
+	font-family: var(--font-mono);
+	font-size: 0.85rem;
+	letter-spacing: 0.2em;
+	text-transform: uppercase;
+	color: var(--gold-bright);
+	text-decoration: none;
+	border: 1px solid var(--border-line);
+	padding: 1.1rem 2rem;
+	border-radius: 999px;
+	transition: all 0.3s ease;
+	width: fit-content;
+}
+
+.enter-module-btn:hover {
+	background: var(--gold-bright);
+	color: #000;
+	border-color: var(--gold-bright);
+	box-shadow: 0 0 25px rgba(255, 212, 121, 0.4);
+}
+
+/* Minimal Outro */
+.course-outro {
+	margin-top: 6rem;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-family: var(--font-mono);
+	font-size: 0.78rem;
+	letter-spacing: 0.25em;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	padding-top: 2.5rem;
+	flex-wrap: wrap;
+	gap: 1rem;
+}
+
+/* Preserve the reference while supporting keyboard, small screens and reduced motion. */
+body {
+	background-image: radial-gradient(ellipse at 70% 28%, #62421d 0, #231b12 22%, #050608 55%);
+}
+.nav-status {
+	display: flex;
+	align-items: center;
+	gap: 2rem;
+}
+.nav-status a {
+	color: var(--text-white);
+	text-decoration: none;
+	letter-spacing: 0.12em;
+}
+.nav-status a:hover {
+	color: var(--gold-bright);
+}
+.monolith-header {
+	list-style: none;
+	cursor: pointer;
+}
+.monolith-header::-webkit-details-marker {
+	display: none;
+}
+.monolith-header::after {
+	content: "+";
+	color: var(--gold-primary);
+	font: 1.5rem var(--font-mono);
+}
+.monolith-item[open] .monolith-header::after {
+	content: "−";
+}
+.item-left {
+	flex: 1;
+}
+.hero-footer {
+	gap: 1.5rem;
+	flex-wrap: wrap;
+	margin-top: 3rem;
+}
+a:focus-visible,
+summary:focus-visible {
+	outline: 2px solid var(--gold-bright);
+	outline-offset: 8px;
+}
+.skip-link {
+	position: fixed;
+	top: -100px;
+	left: 1rem;
+	z-index: 100;
+	padding: 1rem;
+	background: var(--gold-bright);
+	color: #000;
+}
+.skip-link:focus {
+	top: 1rem;
+}
+@media (max-width: 768px) {
+	.nav-status > span {
+		display: none;
+	}
+	.brand-mark {
+		font-size: 0.7rem;
+		letter-spacing: 0.14em;
+	}
+	.nav-status {
+		font-size: 0.65rem;
+	}
+	.hero-inscript {
+		letter-spacing: 0.18em;
+	}
+	.hero-inscript::after {
+		display: none;
+	}
+	.hero-title {
+		font-size: clamp(3.1rem, 12.4vw, 6rem);
+	}
+	.magnetic-course-btn {
+		padding: 1.3rem 1.5rem;
+		gap: 1rem;
+		font-size: 0.8rem;
+		letter-spacing: 0.12em;
+	}
+	.monolith-header {
+		gap: 0.75rem;
+	}
+	.item-title {
+		font-size: clamp(1.25rem, 5vw, 2rem);
+	}
+	.monolith-item:hover {
+		padding-left: 0;
+	}
+	.module-desc {
+		font-size: 1rem;
+	}
+	.section-headline-group {
+		margin-bottom: 2rem;
+	}
+	.course-section {
+		min-height: auto;
+	}
+}
+@media (max-width: 380px) {
+	.top-bar {
+		padding: 1.5rem 1rem;
+	}
+	.nav-status a {
+		letter-spacing: 0;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	html,
+	body {
+		scroll-behavior: auto;
+	}
+	*,
+	*::before,
+	*::after {
+		transition: none !important;
+	}
+}
+
+/* Keep the reference's corona visible while protecting the copy's contrast. */
+.hero-section::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background: linear-gradient(90deg, rgb(5 6 8 / 65%), rgb(5 6 8 / 40%) 42%, transparent 72%);
+}
+.hero-manifesto {
+	color: #c2c5cf;
+}
+@media (max-width: 768px) {
+	.hero-section::before {
+		background: rgb(5 6 8 / 48%);
+	}
+}

@@ -1302,3 +1302,27 @@ runtime data change also needs to be reversed.
 - Expand Amharic translation beyond the sidebar only after terminology review.
 - Publish and, if required, verify the Google OAuth application so Calendar
   authorization does not expire every seven days.
+
+
+## 22. Menbere Tsehay landing page and course languages — 14 September 2026
+
+The public homepage hook now resolves to `menbere-tsehay`. The supplied local
+HTML design was adapted with legal-training copy, working LMS links, native
+keyboard-accessible accordions, responsive spacing and a reduced-motion solar
+animation. The learner dashboard and OAuth destinations remain under `/lms`.
+The root response is a standalone Frappe website template.
+
+A separate browser extension adds catalogue language links and staff language
+management. Course content language is an optional Select custom field on LMS
+Course, installed idempotently on app install/migration. Filtering occurs in
+the existing Biqat course API before upstream pagination and featured-course
+selection. Existing courses are not automatically classified. Course editors
+can manage their own courses; administrators and moderators can manage all.
+
+The current local setup uses native MariaDB and Frappe Bench. The app README's
+old WSL paths and Docker database instructions have been corrected. CI now uses
+the documented Frappe v15.118.0/LMS v2.60.1 pins, Python 3.12 and MariaDB 10.11.
+
+Validation: local backup, migration, custom-app asset build, 73 passing app
+tests and Chromium desktop/mobile checks. The existing custom-app-only cloud
+deployment procedure is in the README.

@@ -202,7 +202,7 @@ class TestBiqatGrading(FrappeTestCase):
 		self.assertEqual(row["course_title"], self.course.title)
 
 	def test_open_ended_answers_appear_in_the_queue(self):
-		submission = self._create_open_ended_quiz_submission()
+		self._create_open_ended_quiz_submission()
 
 		frappe.set_user(self.instructor_email)
 		rows = [row for row in list_gradings()["rows"] if row["kind"] == "quiz"]

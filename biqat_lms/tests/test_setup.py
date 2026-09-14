@@ -2,13 +2,13 @@ import datetime
 from unittest.mock import patch
 
 import frappe
+import frappe.utils.telemetry.pulse.client
 from frappe.tests.utils import FrappeTestCase
 from frappe.website.utils import get_home_page_via_hooks
 from lms import __version__ as lms_version
 from packaging.version import Version
 
 import biqat_lms.hooks as biqat_hooks
-import frappe.utils.telemetry.pulse.client
 from biqat_lms.api import (
 	ALLOWED_PAYMENT_GATEWAY_SETTINGS,
 	get_chart_data,
@@ -20,7 +20,7 @@ from biqat_lms.api import (
 	telemetry_boot_config,
 )
 from biqat_lms.overrides.lms_live_class import BiqatLMSLiveClass
-from biqat_lms.page_renderers import CUSTOMIZATION_SCRIPT, inject_customization_script
+from biqat_lms.page_renderers import COURSE_LANGUAGE_SCRIPT, CUSTOMIZATION_SCRIPT, inject_customization_script
 from biqat_lms.setup.payment_defaults import (
 	CHAPA_GATEWAY,
 	CHAPA_SETTINGS_DOCTYPE,
@@ -76,9 +76,7 @@ class TestBiqatLMSSetup(FrappeTestCase):
 
 		configure_ethiopian_timezone()
 
-		self.assertEqual(
-			frappe.db.get_single_value("System Settings", "time_zone"), ETHIOPIAN_TIMEZONE
-		)
+		self.assertEqual(frappe.db.get_single_value("System Settings", "time_zone"), ETHIOPIAN_TIMEZONE)
 
 	def test_chapa_placeholder_creates_gateway(self):
 		settings = frappe.get_single(CHAPA_SETTINGS_DOCTYPE)
@@ -117,6 +115,7 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		customized_html = inject_customization_script(html)
 
 		self.assertIn(CUSTOMIZATION_SCRIPT, customized_html)
+		self.assertIn(COURSE_LANGUAGE_SCRIPT, customized_html)
 		self.assertEqual(customized_html.count(CUSTOMIZATION_SCRIPT), 1)
 		self.assertLess(customized_html.index(CUSTOMIZATION_SCRIPT), customized_html.index("app.js"))
 		self.assertEqual(inject_customization_script(customized_html), customized_html)
@@ -124,12 +123,12 @@ class TestBiqatLMSSetup(FrappeTestCase):
 	def test_default_website_profile_redirects_to_lms(self):
 		self.assertIn({"source": "/me", "target": "/lms"}, biqat_hooks.website_redirects)
 
-	def test_site_root_serves_the_lms(self):
+	def test_site_root_serves_the_landing_page(self):
 		# get_home_page consults hooks before Website Settings and takes the last
 		# installed app's value, so biqat_lms wins over lms and the stock default.
-		self.assertEqual(biqat_hooks.home_page, "lms")
-		self.assertEqual(frappe.get_hooks("home_page")[-1], "lms")
-		self.assertEqual(get_home_page_via_hooks(), "lms")
+		self.assertEqual(biqat_hooks.home_page, "menbere-tsehay")
+		self.assertEqual(frappe.get_hooks("home_page")[-1], "menbere-tsehay")
+		self.assertEqual(get_home_page_via_hooks(), "menbere-tsehay")
 
 	def test_statistics_endpoints_are_staff_only(self):
 		# Upstream whitelists all three with allow_guest=True and no role check,
@@ -187,9 +186,7 @@ class TestBiqatLMSSetup(FrappeTestCase):
 		# The LMS frontend targets a newer Frappe; without the override this
 		# command raises and every page load logs a traceback in the console.
 		self.assertEqual(
-			biqat_hooks.override_whitelisted_methods[
-				"frappe.utils.telemetry.pulse.client.boot_config"
-			],
+			biqat_hooks.override_whitelisted_methods["frappe.utils.telemetry.pulse.client.boot_config"],
 			"biqat_lms.api.telemetry_boot_config",
 		)
 		self.assertFalse(

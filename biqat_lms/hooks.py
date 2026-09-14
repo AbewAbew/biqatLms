@@ -59,12 +59,9 @@ required_apps = ["frappe/lms"]
 # Frappe OAuth sends website users to /me when no redirect was supplied.
 website_redirects = [{"source": "/me", "target": "/lms"}]
 
-# The learning platform is the whole product, so the site root is the LMS rather
-# than a separate marketing page. frappe.website.utils.get_home_page consults
-# hooks before Website Settings and takes the last installed app's value, so this
-# wins over both the stock default and anything set in the Website Settings UI.
-# A Role or Portal Settings home page still takes precedence for signed-in users.
-home_page = "lms"
+# Public landing page. The learner dashboard remains available at /lms.
+# Role or Portal Settings home pages still take precedence for signed-in users.
+home_page = "menbere-tsehay"
 
 # website user home page (by Role)
 # role_home_page = {
@@ -93,10 +90,12 @@ home_page = "lms"
 after_install = [
 	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
 	"biqat_lms.setup.grading_fields.create_grading_custom_fields",
+	"biqat_lms.course_languages.create_course_language_field",
 ]
 
 # Keep site-level defaults and derived Program counts correct after migrations.
 after_migrate = [
+	"biqat_lms.course_languages.create_course_language_field",
 	"biqat_lms.setup.site_defaults.configure_ethiopian_site_defaults",
 	"biqat_lms.setup.programs.sync_program_member_counts",
 	"biqat_lms.setup.instructor_profiles.prune_orphaned_instructor_attributions",
@@ -156,7 +155,7 @@ override_doctype_class = {
 # can't intercept it. Patch its two branches directly at import time instead, so
 # the "course published" broadcast credits the managed instructor rather than the
 # internal editor.
-from biqat_lms.overrides import lms_course as _lms_course_patch  # noqa: E402
+from biqat_lms.overrides import lms_course as _lms_course_patch
 
 _lms_course_patch.apply()
 
