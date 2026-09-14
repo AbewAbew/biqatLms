@@ -2,7 +2,7 @@ from frappe.website.page_renderers.base_renderer import BaseRenderer
 from frappe.website.page_renderers.template_page import TemplatePage
 
 CUSTOMIZATION_SCRIPT = '<script src="/assets/biqat_lms/js/lms_customizations.js?v=35"></script>'
-COURSE_LANGUAGE_SCRIPT = '<script src="/assets/biqat_lms/js/course_languages.js?v=2"></script>'
+COURSE_LANGUAGE_SCRIPT = '<script src="/assets/biqat_lms/js/course_languages.js?v=3"></script>'
 
 
 class BiqatLMSRenderer(BaseRenderer):

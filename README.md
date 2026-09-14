@@ -310,7 +310,7 @@ For the landing-page release, also verify:
 
 ```bash
 curl -fsS https://biqat.lexprime.et/ | grep 'Legal Learning'
-curl -fsS https://biqat.lexprime.et/lms/courses | grep 'course_languages.js?v=2'
+curl -fsS https://biqat.lexprime.et/lms/courses | grep 'course_languages.js?v=3'
 ```
 
 Open the public homepage in a private window, follow **Explore Courses**, and
